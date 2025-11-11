@@ -32,10 +32,119 @@
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
     .header h1 {
       color: #667eea;
-      margin-bottom: 10px;
+      margin: 0;
       font-size: 2rem;
+    }
+    
+    .current-time {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #333;
+      font-family: 'Courier New', monospace;
+    }
+    
+    .header-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 20px;
+    }
+    
+    @media (max-width: 768px) {
+      .header-content {
+        grid-template-columns: 1fr;
+      }
+      
+      .header-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+    }
+    
+    .header-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .header-item label {
+      font-weight: 600;
+      color: #555;
+      font-size: 0.9rem;
+    }
+    
+    .header-item input[type="text"] {
+      padding: 8px 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 0.95rem;
+    }
+    
+    .header-item input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .btn-small {
+      padding: 6px 16px;
+      font-size: 0.9rem;
+      margin-top: 4px;
+      align-self: flex-start;
+    }
+    
+    .health-status-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .health-status-btn {
+      flex: 1;
+      padding: 10px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    
+    .health-status-btn:hover {
+      border-color: #667eea;
+    }
+    
+    .health-status-btn.selected {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+    
+    .health-status-btn.good {
+      border-color: #27ae60;
+    }
+    
+    .health-status-btn.good.selected {
+      background: #27ae60;
+      border-color: #27ae60;
+    }
+    
+    .health-status-btn.bad {
+      border-color: #e74c3c;
+    }
+    
+    .health-status-btn.bad.selected {
+      background: #e74c3c;
+      border-color: #e74c3c;
     }
     
     .workload-card {
@@ -426,10 +535,50 @@
       color: #000;
     }
     
-    .health-form {
+    .health-form,
+    .daily-report-form {
       display: flex;
       flex-direction: column;
       gap: 15px;
+    }
+    
+    .completed-tasks-info {
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+    
+    .completed-tasks-summary {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .summary-item {
+      font-size: 0.95rem;
+      color: #555;
+    }
+    
+    .summary-item strong {
+      color: #667eea;
+      font-size: 1.1rem;
+    }
+    
+    .completed-tasks-list {
+      margin: 10px 0 0 0;
+      padding-left: 20px;
+      list-style-type: disc;
+    }
+    
+    .completed-tasks-list li {
+      margin: 5px 0;
+      color: #666;
+    }
+    
+    .info {
+      color: #666;
+      font-style: italic;
     }
     
     .health-score-buttons {
@@ -538,8 +687,25 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>📋 タスク管理ポータル</h1>
-      <p>あなたのタスクと労働時間を可視化</p>
+      <div class="header-top">
+        <h1>📋 タスク管理ポータル</h1>
+        <div id="current-time" class="current-time"></div>
+      </div>
+      <div class="header-content">
+        <div class="header-item">
+          <label for="daily-goal">今日の目標</label>
+          <input type="text" id="daily-goal" placeholder="今日の目標を入力してください">
+          <button type="button" id="save-goal-btn" class="btn btn-primary btn-small">保存</button>
+        </div>
+        <div class="header-item">
+          <label>現在の体調</label>
+          <div class="health-status-buttons">
+            <button type="button" class="health-status-btn good" data-score="良い" onclick="setHealthStatus('良い', this)">良い</button>
+            <button type="button" class="health-status-btn" data-score="普通" onclick="setHealthStatus('普通', this)">普通</button>
+            <button type="button" class="health-status-btn bad" data-score="良くない" onclick="setHealthStatus('良くない', this)">良くない</button>
+          </div>
+        </div>
+      </div>
     </div>
     
     <div class="workload-card">
@@ -600,22 +766,40 @@
     </div>
     
     <div class="card" style="margin-top: 20px;">
-      <h2>💚 体調記録</h2>
-      <form id="health-form" class="health-form">
+      <h2>📝 日報記入欄</h2>
+      <form id="daily-report-form" class="daily-report-form">
         <div class="form-group">
-          <label>今日の体調</label>
+          <label for="report-date">日付</label>
+          <input type="date" id="report-date" name="date" required>
+        </div>
+        <div class="form-group">
+          <label for="report-goal">今日の目標</label>
+          <input type="text" id="report-goal" name="goal" placeholder="今日の目標を入力してください">
+        </div>
+        <div class="form-group">
+          <label>体調スコア</label>
           <div class="health-score-buttons">
-            <button type="button" class="health-score-btn good" data-score="良い" onclick="selectHealthScore('良い', this)">良い</button>
-            <button type="button" class="health-score-btn" data-score="普通" onclick="selectHealthScore('普通', this)">普通</button>
-            <button type="button" class="health-score-btn bad" data-score="良くない" onclick="selectHealthScore('良くない', this)">良くない</button>
+            <button type="button" class="health-score-btn good" data-score="良い" onclick="selectReportHealthScore('良い', this)">良い</button>
+            <button type="button" class="health-score-btn" data-score="普通" onclick="selectReportHealthScore('普通', this)">普通</button>
+            <button type="button" class="health-score-btn bad" data-score="良くない" onclick="selectReportHealthScore('良くない', this)">良くない</button>
           </div>
-          <input type="hidden" id="health-score" name="score" required>
+          <input type="hidden" id="report-health-score" name="healthScore">
         </div>
         <div class="form-group">
-          <label for="health-memo">メモ（任意）</label>
-          <textarea id="health-memo" name="memo" rows="3"></textarea>
+          <label>今日完了したタスク</label>
+          <div id="completed-tasks-info" class="completed-tasks-info">
+            <div class="loading">読み込み中...</div>
+          </div>
         </div>
-        <button type="submit" class="btn btn-primary">体調を記録</button>
+        <div class="form-group">
+          <label for="report-reflection">今日の振り返り</label>
+          <textarea id="report-reflection" name="reflection" rows="4" placeholder="今日の振り返りを入力してください"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="report-tomorrow-plan">明日の予定（任意）</label>
+          <textarea id="report-tomorrow-plan" name="tomorrowPlan" rows="3" placeholder="明日の予定を入力してください"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">日報を送信</button>
       </form>
     </div>
   </div>
@@ -754,7 +938,160 @@
     // ページ読み込み時にデータを取得
     window.onload = function() {
       loadData();
+      startClock();
+      loadTodayGoal();
+      loadTodayHealth();
+      
+      // 日報フォームの日付を今日に設定
+      const today = new Date().toISOString().split('T')[0];
+      const reportDateInput = document.getElementById('report-date');
+      if (reportDateInput) {
+        reportDateInput.value = today;
+        
+        // 今日の日報データと完了タスクを読み込む
+        loadDailyReport(today);
+        loadCompletedTasksToday(today);
+      }
     };
+    
+    // リアルタイム時計の更新
+    function startClock() {
+      function updateClock() {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('ja-JP', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          weekday: 'short'
+        });
+        const timeStr = now.toLocaleTimeString('ja-JP', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        
+        const timeElement = document.getElementById('current-time');
+        if (timeElement) {
+          timeElement.textContent = dateStr + ' ' + timeStr;
+        }
+      }
+      
+      // 初回表示
+      updateClock();
+      
+      // 1秒ごとに更新
+      setInterval(updateClock, 1000);
+    }
+    
+    // 今日の目標を読み込む
+    function loadTodayGoal() {
+      const today = new Date().toISOString().split('T')[0];
+      callGasWithLoading(null, function(enableButton) {
+        return google.script.run
+          .withSuccessHandler(function(goal) {
+            enableButton();
+            if (goal && !goal.error) {
+              document.getElementById('daily-goal').value = goal || '';
+            }
+          })
+          .withFailureHandler(function(error) {
+            enableButton();
+            // エラーは無視（目標が未設定の場合もある）
+          })
+          .getDailyGoal(today);
+      });
+    }
+    
+    // 今日の目標を保存
+    document.getElementById('save-goal-btn').addEventListener('click', function() {
+      const button = this;
+      const goal = document.getElementById('daily-goal').value;
+      const today = new Date().toISOString().split('T')[0];
+      
+      callGasWithLoading(button, function(enableButton) {
+        return google.script.run
+          .withSuccessHandler(function(result) {
+            enableButton();
+            if (result.error) {
+              alert('エラー: ' + result.message);
+            } else {
+              alert('目標が保存されました！');
+            }
+          })
+          .withFailureHandler(function(error) {
+            enableButton();
+            showError(error);
+          })
+          .saveDailyGoal(today, goal);
+      }, { loadingText: '保存中...' });
+    });
+    
+    // 体調ステータスを設定
+    function setHealthStatus(score, buttonElement) {
+      // すべてのボタンからselectedクラスを削除
+      document.querySelectorAll('.health-status-btn').forEach(btn => {
+        btn.classList.remove('selected');
+      });
+      
+      // 選択したボタンにselectedクラスを追加
+      buttonElement.classList.add('selected');
+      
+      // 体調を記録（ローディング表示なしで静かに記録）
+      const today = new Date().toISOString().split('T')[0];
+      const healthData = {
+        date: today,
+        score: score,
+        memo: ''
+      };
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result && result.error) {
+            // エラー時のみアラートを表示
+            alert('エラー: ' + result.message);
+            // エラー時は選択を元に戻す
+            buttonElement.classList.remove('selected');
+          }
+          // 成功時は何も表示しない（静かに記録）
+        })
+        .withFailureHandler(function(error) {
+          // エラー時は選択を元に戻す
+          buttonElement.classList.remove('selected');
+          showError(error);
+        })
+        .recordHealthScore(healthData);
+    }
+    
+    // 今日の体調を読み込む
+    function loadTodayHealth() {
+      const today = new Date().toISOString().split('T')[0];
+      callGasWithLoading(null, function(enableButton) {
+        return google.script.run
+          .withSuccessHandler(function(healthData) {
+            enableButton();
+            if (healthData && !healthData.error && Array.isArray(healthData) && healthData.length > 0) {
+              // 最新の記録を取得
+              const latest = healthData[healthData.length - 1];
+              if (latest && latest.score) {
+                // 該当するボタンを選択状態にする
+                const button = document.querySelector(`.health-status-btn[data-score="${latest.score}"]`);
+                if (button) {
+                  document.querySelectorAll('.health-status-btn').forEach(btn => {
+                    btn.classList.remove('selected');
+                  });
+                  button.classList.add('selected');
+                }
+              }
+            }
+          })
+          .withFailureHandler(function(error) {
+            enableButton();
+            // エラーは無視（体調が未記録の場合もある）
+          })
+          .getHealthScores(today, today);
+      });
+    }
     
     // データを読み込む
     function loadData() {
@@ -1086,7 +1423,7 @@
       if (selectElement) {
         selectElement.disabled = true;
       }
-      
+
       callGasWithLoading(null, function(enableButton) {
         return google.script.run
           .withSuccessHandler(function(result) {
@@ -1096,6 +1433,14 @@
               loadTasks(); // エラー時は再読み込み
             } else {
               loadData(); // データを再読み込み
+              
+              // ステータスが「完了」に変更された場合、完了タスクを再読み込み
+              if (status === '完了') {
+                const reportDateInput = document.getElementById('report-date');
+                if (reportDateInput && reportDateInput.value) {
+                  loadCompletedTasksToday(reportDateInput.value);
+                }
+              }
             }
             // セレクトボックスを再有効化
             if (selectElement) {
@@ -1114,10 +1459,11 @@
       });
     }
     
-    // 体調スコアを選択
-    function selectHealthScore(score, button) {
+    // 日報フォーム用の体調スコアを選択
+    function selectReportHealthScore(score, button) {
       // すべてのボタンからselectedクラスを削除
-      document.querySelectorAll('.health-score-btn').forEach(btn => {
+      const form = document.getElementById('daily-report-form');
+      form.querySelectorAll('.health-score-btn').forEach(btn => {
         btn.classList.remove('selected');
       });
       
@@ -1125,49 +1471,130 @@
       button.classList.add('selected');
       
       // 隠しフィールドに値を設定
-      document.getElementById('health-score').value = score;
+      document.getElementById('report-health-score').value = score;
     }
     
-    // 体調記録フォームの送信
-    document.getElementById('health-form').addEventListener('submit', function(e) {
+    // 今日完了したタスクを読み込む
+    function loadCompletedTasksToday(date) {
+      const infoElement = document.getElementById('completed-tasks-info');
+      if (!infoElement) return;
+      
+      callGasWithLoading(null, function(enableButton) {
+        return google.script.run
+          .withSuccessHandler(function(result) {
+            enableButton();
+            if (result.error) {
+              infoElement.innerHTML = '<div class="error">エラー: ' + result.message + '</div>';
+              return;
+            }
+            
+            if (result.count === 0) {
+              infoElement.innerHTML = '<div class="info">今日完了したタスクはありません</div>';
+            } else {
+              let html = '<div class="completed-tasks-summary">';
+              html += '<div class="summary-item">完了タスク数: <strong>' + result.count + '件</strong></div>';
+              html += '<div class="summary-item">完了タスク時間合計: <strong>' + result.totalHours + '時間</strong></div>';
+              if (result.tasks && result.tasks.length > 0) {
+                html += '<ul class="completed-tasks-list">';
+                result.tasks.forEach(function(task) {
+                  html += '<li>' + task.title + ' (' + task.estimatedHours + '時間)</li>';
+                });
+                html += '</ul>';
+              }
+              html += '</div>';
+              infoElement.innerHTML = html;
+            }
+          })
+          .withFailureHandler(function(error) {
+            enableButton();
+            infoElement.innerHTML = '<div class="error">エラー: ' + error + '</div>';
+          })
+          .getCompletedTasksToday(date);
+      });
+    }
+    
+    // 日報フォームの送信
+    document.getElementById('daily-report-form').addEventListener('submit', function(e) {
       e.preventDefault();
       
       const form = this;
       const submitButton = form.querySelector('button[type="submit"]');
       
-      const score = document.getElementById('health-score').value;
-      if (!score) {
-        alert('体調スコアを選択してください');
+      const date = document.getElementById('report-date').value;
+      if (!date) {
+        alert('日付を選択してください');
         return;
       }
       
-      const healthData = {
-        date: new Date().toISOString().split('T')[0],
-        score: score,
-        memo: document.getElementById('health-memo').value
+      const reportData = {
+        date: date,
+        goal: document.getElementById('report-goal').value,
+        healthScore: document.getElementById('report-health-score').value,
+        reflection: document.getElementById('report-reflection').value,
+        tomorrowPlan: document.getElementById('report-tomorrow-plan').value
       };
       
       callGasWithLoading(submitButton, function(enableButton) {
         return google.script.run
           .withSuccessHandler(function(result) {
-            enableButton(); // 処理完了後に再有効化
+            enableButton();
             if (result.error) {
               alert('エラー: ' + result.message);
             } else {
-              alert('体調が記録されました！');
-              form.reset();
-              document.querySelectorAll('.health-score-btn').forEach(btn => {
-                btn.classList.remove('selected');
-              });
+              alert('日報が送信されました！');
+              // 完了タスク情報を再読み込み
+              loadCompletedTasksToday(date);
             }
           })
           .withFailureHandler(function(error) {
-            enableButton(); // エラー時も再有効化
+            enableButton();
             showError(error);
           })
-          .recordHealthScore(healthData);
-      }, { loadingText: '記録中...' });
+          .recordDailyReport(reportData);
+      }, { loadingText: '送信中...' });
     });
+    
+    // 日付が変更されたときに完了タスクを再読み込み
+    document.getElementById('report-date').addEventListener('change', function() {
+      const date = this.value;
+      if (date) {
+        loadCompletedTasksToday(date);
+        // 日報データも読み込む
+        loadDailyReport(date);
+      }
+    });
+    
+    // 日報データを読み込む
+    function loadDailyReport(date) {
+      callGasWithLoading(null, function(enableButton) {
+        return google.script.run
+          .withSuccessHandler(function(report) {
+            enableButton();
+            if (report.error) {
+              // エラーは無視（日報が未作成の場合もある）
+              return;
+            }
+            
+            // フォームにデータを設定
+            document.getElementById('report-goal').value = report.goal || '';
+            document.getElementById('report-reflection').value = report.reflection || '';
+            document.getElementById('report-tomorrow-plan').value = report.tomorrowPlan || '';
+            
+            // 退社時体調スコアを設定（日報フォーム内）
+            if (report.healthScore) {
+              const button = document.querySelector('#daily-report-form .health-score-btn[data-score="' + report.healthScore + '"]');
+              if (button) {
+                selectReportHealthScore(report.healthScore, button);
+              }
+            }
+          })
+          .withFailureHandler(function(error) {
+            enableButton();
+            // エラーは無視
+          })
+          .getDailyReport(date);
+      });
+    }
   </script>
 </body>
 </html>

@@ -14,6 +14,7 @@
 const SHEET_NAME_TASKS = 'タスク';
 const SHEET_NAME_CALENDAR = 'カレンダー';
 const SHEET_NAME_HEALTH = '体調';
+const SHEET_NAME_REPORT = '日報';
 
 /**
  * スプレッドシートIDを取得
@@ -128,6 +129,37 @@ function initializeSpreadsheet() {
     ]]);
     healthSheet.getRange(1, 1, 1, 4).setFontWeight('bold');
     healthSheet.setFrozenRows(1);
+  }
+  
+  // 日報シートの作成
+  let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+  if (!reportSheet) {
+    reportSheet = ss.insertSheet(SHEET_NAME_REPORT);
+    // ヘッダー行を設定
+    reportSheet.getRange(1, 1, 1, 9).setValues([[
+      '日付', '目標', '出社時体調', '退社時体調', '完了タスク数', '完了タスク時間合計', '振り返り', '明日の予定', '記録日時'
+    ]]);
+    reportSheet.getRange(1, 1, 1, 9).setFontWeight('bold');
+    reportSheet.setFrozenRows(1);
+  } else {
+    // 既存のシートがある場合、列数を確認して必要に応じて更新
+    const headers = reportSheet.getRange(1, 1, 1, reportSheet.getLastColumn()).getValues()[0];
+    if (headers.length < 9 || headers[2] !== '出社時体調' || headers[3] !== '退社時体調') {
+      // 古い形式の場合は列を追加
+      if (headers.length === 8 && headers[2] === '体調スコア') {
+        // 体調スコア列を出社時体調と退社時体調に分割
+        reportSheet.insertColumnAfter(3); // 3列目の後に列を挿入
+        reportSheet.getRange(1, 3).setValue('出社時体調');
+        reportSheet.getRange(1, 4).setValue('退社時体調');
+        // 既存の体調スコアデータを出社時体調に移動（退社時体調は空）
+        const lastRow = reportSheet.getLastRow();
+        if (lastRow > 1) {
+          const oldHealthData = reportSheet.getRange(2, 3, lastRow - 1, 1).getValues();
+          reportSheet.getRange(2, 3, lastRow - 1, 1).setValues(oldHealthData);
+          reportSheet.getRange(2, 4, lastRow - 1, 1).setValue(''); // 退社時体調は空
+        }
+      }
+    }
   }
   
   return {
@@ -531,7 +563,8 @@ function getCalendarEvents() {
 }
 
 /**
- * 体調スコアを記録
+ * 体調スコアを記録（出社時）
+ * ヘッダーの体調ステータスボタンから呼び出される
  */
 function recordHealthScore(healthData) {
   try {
@@ -553,64 +586,99 @@ function recordHealthScore(healthData) {
       };
     }
     
+    const date = healthData.date || new Date().toISOString().split('T')[0];
+    const score = healthData.score || '普通'; // 良い/普通/良くない
+    
+    // 日報シートに出社時体調を保存
+    let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+    if (!reportSheet) {
+      initializeSpreadsheet();
+      reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+    }
+    
+    if (reportSheet) {
+      const data = reportSheet.getDataRange().getValues();
+      let found = false;
+      
+      // 既存の行を検索
+      for (let i = 1; i < data.length; i++) {
+        const rowDate = data[i][0];
+        let rowDateStr = '';
+        
+        if (rowDate instanceof Date) {
+          rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        } else if (typeof rowDate === 'string') {
+          rowDateStr = rowDate.split(' ')[0];
+        }
+        
+        if (rowDateStr === date) {
+          // 出社時体調を更新（3列目）
+          reportSheet.getRange(i + 1, 3).setValue(score);
+          found = true;
+          break;
+        }
+      }
+      
+      // 見つからない場合は新規追加
+      if (!found) {
+        const newRow = [
+          date,
+          '', // 目標
+          score, // 出社時体調
+          '', // 退社時体調
+          0,  // 完了タスク数
+          0,  // 完了タスク時間合計
+          '', // 振り返り
+          '', // 明日の予定
+          new Date() // 記録日時
+        ];
+        reportSheet.appendRow(newRow);
+      }
+    }
+    
+    // 体調シートにも記録（後方互換性のため）
     let healthSheet;
     try {
       healthSheet = ss.getSheetByName(SHEET_NAME_HEALTH);
     } catch (sheetError) {
       Logger.log('Failed to get sheet by name in recordHealthScore: ' + sheetError.toString());
-      return {
-        error: true,
-        message: '体調シートの取得に失敗しました: ' + sheetError.toString()
-      };
     }
     
-    // シートが存在しない場合は初期化
-    if (!healthSheet) {
-      initializeSpreadsheet();
-      healthSheet = ss.getSheetByName(SHEET_NAME_HEALTH);
-      if (!healthSheet) {
-        return {
-          error: true,
-          message: '体調シートの作成に失敗しました'
-        };
+    if (healthSheet) {
+      const memo = healthData.memo || '';
+      const now = new Date();
+      
+      // 同じ日付の記録があるか確認
+      const data = healthSheet.getDataRange().getValues();
+      let rowIndex = -1;
+      for (let i = 1; i < data.length; i++) {
+        const recordDate = data[i][0];
+        if (recordDate && recordDate.toString() === date) {
+          rowIndex = i + 1;
+          break;
+        }
       }
-    }
-    
-    const date = healthData.date || new Date().toISOString().split('T')[0];
-    const score = healthData.score || '普通'; // 良い/普通/良くない
-    const memo = healthData.memo || '';
-    const now = new Date();
-    
-    // 同じ日付の記録があるか確認
-    const data = healthSheet.getDataRange().getValues();
-    let rowIndex = -1;
-    for (let i = 1; i < data.length; i++) {
-      const recordDate = data[i][0];
-      if (recordDate && recordDate.toString() === date) {
-        rowIndex = i + 1;
-        break;
+      
+      const newRow = [
+        date,
+        score,
+        memo,
+        now.toISOString()
+      ];
+      
+      if (rowIndex > 0) {
+        // 既存の記録を更新
+        healthSheet.getRange(rowIndex, 1, 1, 4).setValues([newRow]);
+      } else {
+        // 新しい記録を追加
+        healthSheet.appendRow(newRow);
       }
-    }
-    
-    const newRow = [
-      date,
-      score,
-      memo,
-      now.toISOString()
-    ];
-    
-    if (rowIndex > 0) {
-      // 既存の記録を更新
-      healthSheet.getRange(rowIndex, 1, 1, 4).setValues([newRow]);
-    } else {
-      // 新しい記録を追加
-      healthSheet.appendRow(newRow);
     }
     
     return {
       success: true,
       date: date,
-      message: '体調スコアが記録されました'
+      message: '出社時体調が記録されました'
     };
   } catch (error) {
     Logger.log('Error in recordHealthScore: ' + error.toString());
@@ -752,6 +820,329 @@ function getWeeklyWorkload() {
     };
   } catch (error) {
     Logger.log('Error in getWeeklyWorkload: ' + error.toString());
+    return {
+      error: true,
+      message: error.toString()
+    };
+  }
+}
+
+/**
+ * 今日の目標を保存
+ * @param {string} date - 日付（YYYY-MM-DD形式）
+ * @param {string} goal - 目標
+ */
+function saveDailyGoal(date, goal) {
+  try {
+    const ss = getSpreadsheet();
+    let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+    
+    if (!reportSheet) {
+      // 日報シートが存在しない場合は初期化を実行
+      initializeSpreadsheet();
+      reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+      if (!reportSheet) {
+        return {
+          error: true,
+          message: '日報シートが見つかりません。初期化を実行してください。'
+        };
+      }
+    }
+    
+    const data = reportSheet.getDataRange().getValues();
+    let found = false;
+    
+    // 既存の行を検索（日付列は1列目、インデックス0）
+    for (let i = 1; i < data.length; i++) {
+      const rowDate = data[i][0];
+      if (rowDate instanceof Date) {
+        const rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        if (rowDateStr === date) {
+          // 既存の行を更新（目標列は2列目、インデックス1）
+          reportSheet.getRange(i + 1, 2).setValue(goal);
+          found = true;
+          break;
+        }
+      } else if (rowDate === date) {
+        reportSheet.getRange(i + 1, 2).setValue(goal);
+        found = true;
+        break;
+      }
+    }
+    
+    // 見つからない場合は新規追加
+    if (!found) {
+      const newRow = [
+        date,
+        goal,
+        '', // 体調スコア
+        0,  // 完了タスク数
+        0,  // 完了タスク時間合計
+        '', // 振り返り
+        '', // 明日の予定
+        new Date() // 記録日時
+      ];
+      reportSheet.appendRow(newRow);
+    }
+    
+    return {
+      success: true,
+      message: '目標が保存されました'
+    };
+  } catch (error) {
+    Logger.log('Error in saveDailyGoal: ' + error.toString());
+    return {
+      error: true,
+      message: error.toString()
+    };
+  }
+}
+
+/**
+ * 今日の目標を取得
+ * @param {string} date - 日付（YYYY-MM-DD形式）
+ */
+function getDailyGoal(date) {
+  try {
+    const ss = getSpreadsheet();
+    let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+    
+    if (!reportSheet) {
+      return ''; // シートが存在しない場合は空文字を返す
+    }
+    
+    const data = reportSheet.getDataRange().getValues();
+    
+    // 日付に一致する行を検索
+    for (let i = 1; i < data.length; i++) {
+      const rowDate = data[i][0];
+      if (rowDate instanceof Date) {
+        const rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        if (rowDateStr === date) {
+          return data[i][1] || ''; // 目標列（2列目、インデックス1）
+        }
+      } else if (rowDate === date) {
+        return data[i][1] || '';
+      }
+    }
+    
+    return ''; // 見つからない場合は空文字
+  } catch (error) {
+    Logger.log('Error in getDailyGoal: ' + error.toString());
+    return '';
+  }
+}
+
+/**
+ * 今日完了したタスクを取得
+ * @param {string} date - 日付（YYYY-MM-DD形式）
+ */
+function getCompletedTasksToday(date) {
+  try {
+    const tasks = getTasks();
+    
+    if (tasks.error || !Array.isArray(tasks)) {
+      return {
+        count: 0,
+        totalHours: 0,
+        tasks: []
+      };
+    }
+    
+    const today = new Date(date);
+    const todayStr = Utilities.formatDate(today, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    
+    // 今日完了したタスクをフィルタリング
+    const completedTasks = tasks.filter(task => {
+      if (task.status !== '完了') {
+        return false;
+      }
+      
+      // 更新日時が今日かどうかを確認
+      if (task.updatedAt) {
+        const updatedDate = new Date(task.updatedAt);
+        const updatedDateStr = Utilities.formatDate(updatedDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        return updatedDateStr === todayStr;
+      }
+      
+      return false;
+    });
+    
+    const totalHours = completedTasks.reduce((sum, task) => {
+      return sum + (parseFloat(task.estimatedHours) || 0);
+    }, 0);
+    
+    return {
+      count: completedTasks.length,
+      totalHours: totalHours,
+      tasks: completedTasks.map(task => ({
+        id: task.id,
+        title: task.title,
+        estimatedHours: task.estimatedHours
+      }))
+    };
+  } catch (error) {
+    Logger.log('Error in getCompletedTasksToday: ' + error.toString());
+    return {
+      error: true,
+      message: error.toString(),
+      count: 0,
+      totalHours: 0,
+      tasks: []
+    };
+  }
+}
+
+/**
+ * 日報を記録
+ * @param {Object} reportData - 日報データ
+ * @param {string} reportData.date - 日付（YYYY-MM-DD形式）
+ * @param {string} reportData.goal - 目標
+ * @param {string} reportData.healthScore - 体調スコア
+ * @param {string} reportData.reflection - 振り返り
+ * @param {string} reportData.tomorrowPlan - 明日の予定
+ */
+function recordDailyReport(reportData) {
+  try {
+    const ss = getSpreadsheet();
+    let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+    
+    if (!reportSheet) {
+      // 日報シートが存在しない場合は初期化を実行
+      initializeSpreadsheet();
+      reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+      if (!reportSheet) {
+        return {
+          error: true,
+          message: '日報シートが見つかりません。初期化を実行してください。'
+        };
+      }
+    }
+    
+    // 今日完了したタスクを取得
+    const completedTasks = getCompletedTasksToday(reportData.date);
+    
+    const data = reportSheet.getDataRange().getValues();
+    let found = false;
+    
+    // 既存の行を検索（日付列は1列目、インデックス0）
+    for (let i = 1; i < data.length; i++) {
+      const rowDate = data[i][0];
+      let rowDateStr = '';
+      
+      if (rowDate instanceof Date) {
+        rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      } else if (typeof rowDate === 'string') {
+        rowDateStr = rowDate.split(' ')[0]; // 日付部分のみ取得
+      }
+      
+      if (rowDateStr === reportData.date) {
+        // 既存の行を更新
+        reportSheet.getRange(i + 1, 2).setValue(reportData.goal || ''); // 目標
+        // 出社時体調は既存の値を保持（更新しない）
+        // reportSheet.getRange(i + 1, 3).setValue(reportData.arrivalHealthScore || ''); // 出社時体調
+        reportSheet.getRange(i + 1, 4).setValue(reportData.healthScore || ''); // 退社時体調
+        reportSheet.getRange(i + 1, 5).setValue(completedTasks.count || 0); // 完了タスク数
+        reportSheet.getRange(i + 1, 6).setValue(completedTasks.totalHours || 0); // 完了タスク時間合計
+        reportSheet.getRange(i + 1, 7).setValue(reportData.reflection || ''); // 振り返り
+        reportSheet.getRange(i + 1, 8).setValue(reportData.tomorrowPlan || ''); // 明日の予定
+        reportSheet.getRange(i + 1, 9).setValue(new Date()); // 記録日時
+        found = true;
+        break;
+      }
+    }
+    
+    // 見つからない場合は新規追加
+    if (!found) {
+      const newRow = [
+        reportData.date,
+        reportData.goal || '',
+        reportData.arrivalHealthScore || '', // 出社時体調
+        reportData.healthScore || '', // 退社時体調
+        completedTasks.count || 0,
+        completedTasks.totalHours || 0,
+        reportData.reflection || '',
+        reportData.tomorrowPlan || '',
+        new Date() // 記録日時
+      ];
+      reportSheet.appendRow(newRow);
+    }
+    
+    return {
+      success: true,
+      message: '日報が保存されました'
+    };
+  } catch (error) {
+    Logger.log('Error in recordDailyReport: ' + error.toString());
+    return {
+      error: true,
+      message: error.toString()
+    };
+  }
+}
+
+/**
+ * 日報を取得
+ * @param {string} date - 日付（YYYY-MM-DD形式）
+ */
+function getDailyReport(date) {
+  try {
+    const ss = getSpreadsheet();
+    let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+    
+    if (!reportSheet) {
+      return {
+        error: false,
+        date: date,
+        goal: '',
+        healthScore: '',
+        completedTaskCount: 0,
+        completedTaskHours: 0,
+        reflection: '',
+        tomorrowPlan: ''
+      };
+    }
+    
+    const data = reportSheet.getDataRange().getValues();
+    
+    // 日付に一致する行を検索
+    for (let i = 1; i < data.length; i++) {
+      const rowDate = data[i][0];
+      let rowDateStr = '';
+      
+      if (rowDate instanceof Date) {
+        rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      } else if (typeof rowDate === 'string') {
+        rowDateStr = rowDate.split(' ')[0]; // 日付部分のみ取得
+      }
+      
+      if (rowDateStr === date) {
+        return {
+          error: false,
+          date: date,
+          goal: data[i][1] || '',
+          healthScore: data[i][2] || '',
+          completedTaskCount: data[i][3] || 0,
+          completedTaskHours: data[i][4] || 0,
+          reflection: data[i][5] || '',
+          tomorrowPlan: data[i][6] || ''
+        };
+      }
+    }
+    
+    // 見つからない場合は空のデータを返す
+    return {
+      error: false,
+      date: date,
+      goal: '',
+      healthScore: '',
+      completedTaskCount: 0,
+      completedTaskHours: 0,
+      reflection: '',
+      tomorrowPlan: ''
+    };
+  } catch (error) {
+    Logger.log('Error in getDailyReport: ' + error.toString());
     return {
       error: true,
       message: error.toString()
