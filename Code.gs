@@ -124,7 +124,7 @@ function initializeSpreadsheet() {
     reportSheet = ss.insertSheet(SHEET_NAME_REPORT);
     // ヘッダー行を設定
     reportSheet.getRange(1, 1, 1, 9).setValues([[
-      '日付', '目標', '出社時体調', '退社時体調', '完了タスク数', '完了タスク時間合計', '振り返り', '明日の予定', '記録日時'
+      '日付', '目標', '出社時体調', '退社時体調', '完了タスク数合計', '完了タスク時間合計', '振り返り', '明日の予定', '記録日時'
     ]]);
     reportSheet.getRange(1, 1, 1, 9).setFontWeight('bold');
     reportSheet.setFrozenRows(1);
@@ -153,7 +153,7 @@ function initializeSpreadsheet() {
         reportSheet.getRange(2, 4, lastRow - 1, 1).setValue('');
         
         // 以降の列を1つ右にシフト
-        // 完了タスク数（4→5列目）
+        // 完了タスク数合計（4→5列目）
         if (lastRow > 1) {
           const taskCountData = reportSheet.getRange(2, 4, lastRow - 1, 1).getValues();
           reportSheet.getRange(2, 5, lastRow - 1, 1).setValues(taskCountData);
@@ -685,78 +685,6 @@ function recordHealthScore(healthData) {
 }
 
 /**
- * 体調スコアを取得
- */
-function getHealthScores(startDate, endDate) {
-  try {
-    let ss;
-    try {
-      ss = getSpreadsheet();
-    } catch (spreadsheetError) {
-      Logger.log('Failed to get spreadsheet in getHealthScores: ' + spreadsheetError.toString());
-      return {
-        error: true,
-        message: 'スプレッドシートを取得できませんでした: ' + spreadsheetError.toString()
-      };
-    }
-    
-    if (!ss) {
-      return {
-        error: true,
-        message: 'スプレッドシートを取得できませんでした（null）'
-      };
-    }
-    
-    let healthSheet;
-    try {
-      healthSheet = ss.getSheetByName(SHEET_NAME_HEALTH);
-    } catch (sheetError) {
-      Logger.log('Failed to get sheet by name in getHealthScores: ' + sheetError.toString());
-      return {
-        error: true,
-        message: '体調シートの取得に失敗しました: ' + sheetError.toString()
-      };
-    }
-    
-    if (!healthSheet) {
-      return [];
-    }
-    
-    const data = healthSheet.getDataRange().getValues();
-    const healthScores = [];
-    
-    // ヘッダー行をスキップ
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (row[0]) {
-        const recordDate = new Date(row[0]);
-        const start = startDate ? new Date(startDate) : null;
-        const end = endDate ? new Date(endDate) : null;
-        
-        // 日付範囲のフィルタリング
-        if (start && recordDate < start) continue;
-        if (end && recordDate > end) continue;
-        
-        healthScores.push({
-          date: row[0],
-          score: row[1] || '普通',
-          memo: row[2] || '',
-          recordedAt: row[3] || ''
-        });
-      }
-    }
-    
-    return healthScores;
-  } catch (error) {
-    Logger.log('Error in getHealthScores: ' + error.toString());
-    return {
-      error: true,
-      message: error.toString()
-    };
-  }
-}
-
-/**
  * 週のタスク負荷を計算
  */
 function getWeeklyWorkload() {
@@ -1132,7 +1060,8 @@ function getDailyReport(date) {
         error: false,
         date: date,
         goal: '',
-        healthScore: '',
+        arrivalHealthScore: '',
+        healthScore: '', // 退社時体調
         completedTaskCount: 0,
         completedTaskHours: 0,
         reflection: '',
@@ -1154,15 +1083,17 @@ function getDailyReport(date) {
       }
       
       if (rowDateStr === date) {
+        // 列の順序: 日付(0), 目標(1), 出社時体調(2), 退社時体調(3), 完了タスク数合計(4), 完了タスク時間合計(5), 振り返り(6), 明日の予定(7), 記録日時(8)
         return {
           error: false,
           date: date,
           goal: data[i][1] || '',
-          healthScore: data[i][2] || '',
-          completedTaskCount: data[i][3] || 0,
-          completedTaskHours: data[i][4] || 0,
-          reflection: data[i][5] || '',
-          tomorrowPlan: data[i][6] || ''
+          arrivalHealthScore: data[i][2] || '', // 出社時体調
+          healthScore: data[i][3] || '', // 退社時体調（後方互換性のためhealthScoreも保持）
+          completedTaskCount: data[i][4] || 0, // 完了タスク数合計
+          completedTaskHours: data[i][5] || 0, // 完了タスク時間合計
+          reflection: data[i][6] || '', // 振り返り
+          tomorrowPlan: data[i][7] || '' // 明日の予定
         };
       }
     }
@@ -1172,7 +1103,8 @@ function getDailyReport(date) {
       error: false,
       date: date,
       goal: '',
-      healthScore: '',
+      arrivalHealthScore: '',
+      healthScore: '', // 退社時体調
       completedTaskCount: 0,
       completedTaskHours: 0,
       reflection: '',

@@ -53,21 +53,25 @@
     }
     
     .header-content {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      display: flex;
+      flex-direction: column;
       gap: 20px;
       margin-top: 20px;
     }
     
     @media (max-width: 768px) {
-      .header-content {
-        grid-template-columns: 1fr;
-      }
-      
       .header-top {
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
+      }
+      
+      .goal-input-wrapper {
+        flex-direction: column;
+      }
+      
+      .goal-input-wrapper .btn-small {
+        align-self: flex-start;
       }
     }
     
@@ -77,22 +81,70 @@
       gap: 8px;
     }
     
+    .header-item.full-width {
+      width: 100%;
+    }
+    
+    .health-status-wrapper {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    
+    .health-status-wrapper .health-status-buttons {
+      flex: 1;
+      display: flex;
+      gap: 8px;
+    }
+    
+    .health-status-wrapper .health-status-btn {
+      flex: 0 0 30%;
+    }
+    
+    .health-status-wrapper .btn-small {
+      flex: 0 0 10%;
+      margin-top: 0;
+    }
+    
     .header-item label {
       font-weight: 600;
       color: #555;
       font-size: 0.9rem;
     }
     
-    .header-item input[type="text"] {
+    .header-item input[type="text"],
+    .header-item textarea {
       padding: 8px 12px;
       border: 2px solid #e0e0e0;
       border-radius: 6px;
       font-size: 0.95rem;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 60px;
     }
     
-    .header-item input[type="text"]:focus {
+    .header-item input[type="text"]:focus,
+    .header-item textarea:focus {
       outline: none;
       border-color: #667eea;
+    }
+    
+    .header-item textarea {
+      width: 100%;
+    }
+    
+    .goal-input-wrapper {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    
+    .goal-input-wrapper textarea {
+      width: 100%;
+    }
+    
+    .goal-input-wrapper .btn-small {
+      flex-shrink: 0;
     }
     
     .btn-small {
@@ -692,17 +744,19 @@
         <div id="current-time" class="current-time"></div>
       </div>
       <div class="header-content">
-        <div class="header-item">
+        <div class="header-item full-width">
           <label for="daily-goal">今日の目標</label>
-          <input type="text" id="daily-goal" placeholder="今日の目標を入力してください">
-          <button type="button" id="save-goal-btn" class="btn btn-primary btn-small">保存</button>
+          <textarea id="daily-goal" placeholder="今日の目標を入力してください" rows="3"></textarea>
         </div>
         <div class="header-item">
           <label>現在の体調</label>
-          <div class="health-status-buttons">
-            <button type="button" class="health-status-btn good" data-score="良い" onclick="setHealthStatus('良い', this)">良い</button>
-            <button type="button" class="health-status-btn" data-score="普通" onclick="setHealthStatus('普通', this)">普通</button>
-            <button type="button" class="health-status-btn bad" data-score="良くない" onclick="setHealthStatus('良くない', this)">良くない</button>
+          <div class="health-status-wrapper">
+            <div class="health-status-buttons">
+              <button type="button" class="health-status-btn good" data-score="良い" onclick="setHealthStatus('良い', this)">良い</button>
+              <button type="button" class="health-status-btn" data-score="普通" onclick="setHealthStatus('普通', this)">普通</button>
+              <button type="button" class="health-status-btn bad" data-score="良くない" onclick="setHealthStatus('良くない', this)">良くない</button>
+            </div>
+            <button type="button" id="save-goal-btn" class="btn btn-primary btn-small" onclick="saveDailyGoal()">保存</button>
           </div>
         </div>
       </div>
