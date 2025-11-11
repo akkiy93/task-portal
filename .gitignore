@@ -33,6 +33,3 @@ yarn-error.log*
 # GAS
 .clasp.json
 .claspignore
-
-# Issue templates
-issue*_body.md
