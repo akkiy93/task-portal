@@ -3,14 +3,17 @@
  * 
  * 機能:
  * - タスクの一覧表示
- * - タスクの追加
+ * - タスクの追加・編集・削除
+ * - タスクのステータス変更
  * - Googleカレンダーからの会議予定取得
  * - 週40時間に対するタスク時間の可視化
+ * - 体調スコアの記録と可視化
  */
 
 // スプレッドシートの設定
 const SHEET_NAME_TASKS = 'タスク';
 const SHEET_NAME_CALENDAR = 'カレンダー';
+const SHEET_NAME_HEALTH = '体調';
 
 /**
  * スプレッドシートIDを取得
@@ -20,11 +23,10 @@ function getSpreadsheetId() {
   const scriptProperties = PropertiesService.getScriptProperties();
   let spreadsheetId = scriptProperties.getProperty('SPREADSHEET_ID');
   
-  // スクリプトプロパティに設定されていない場合は、デフォルト値を使用
-  // 初回セットアップ時は、GASエディタでスクリプトプロパティを設定してください
+  // スクリプトプロパティに設定されていない場合は、エラーを返す
   if (!spreadsheetId) {
-    spreadsheetId = 'YOUR_SPREADSHEET_ID_HERE';
-    Logger.log('Warning: SPREADSHEET_ID is not set in script properties. Using default value.');
+    Logger.log('Error: SPREADSHEET_ID is not set in script properties.');
+    throw new Error('スプレッドシートIDがスクリプトプロパティに設定されていません。GASエディタの「プロジェクトの設定」→「スクリプト プロパティ」で設定してください。');
   }
   
   return spreadsheetId;
@@ -114,6 +116,18 @@ function initializeSpreadsheet() {
     ]]);
     tasksSheet.getRange(1, 1, 1, 8).setFontWeight('bold');
     tasksSheet.setFrozenRows(1);
+  }
+  
+  // 体調シートの作成
+  let healthSheet = ss.getSheetByName(SHEET_NAME_HEALTH);
+  if (!healthSheet) {
+    healthSheet = ss.insertSheet(SHEET_NAME_HEALTH);
+    // ヘッダー行を設定
+    healthSheet.getRange(1, 1, 1, 4).setValues([[
+      '日付', '体調スコア', 'メモ', '記録日時'
+    ]]);
+    healthSheet.getRange(1, 1, 1, 4).setFontWeight('bold');
+    healthSheet.setFrozenRows(1);
   }
   
   return {
@@ -287,6 +301,181 @@ function addTask(taskData) {
 }
 
 /**
+ * タスクを更新
+ */
+function updateTask(taskId, taskData) {
+  try {
+    let ss;
+    try {
+      ss = getSpreadsheet();
+    } catch (spreadsheetError) {
+      Logger.log('Failed to get spreadsheet in updateTask: ' + spreadsheetError.toString());
+      return {
+        error: true,
+        message: 'スプレッドシートを取得できませんでした: ' + spreadsheetError.toString()
+      };
+    }
+    
+    if (!ss) {
+      return {
+        error: true,
+        message: 'スプレッドシートを取得できませんでした（null）'
+      };
+    }
+    
+    let tasksSheet;
+    try {
+      tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
+    } catch (sheetError) {
+      Logger.log('Failed to get sheet by name in updateTask: ' + sheetError.toString());
+      return {
+        error: true,
+        message: 'タスクシートの取得に失敗しました: ' + sheetError.toString()
+      };
+    }
+    
+    if (!tasksSheet) {
+      return {
+        error: true,
+        message: 'タスクシートが見つかりません'
+      };
+    }
+    
+    const data = tasksSheet.getDataRange().getValues();
+    let rowIndex = -1;
+    
+    // タスクIDで行を検索
+    for (let i = 1; i < data.length; i++) {
+      if (parseInt(data[i][0]) === parseInt(taskId)) {
+        rowIndex = i + 1; // スプレッドシートの行番号は1から始まる
+        break;
+      }
+    }
+    
+    if (rowIndex === -1) {
+      return {
+        error: true,
+        message: 'タスクが見つかりませんでした'
+      };
+    }
+    
+    // 既存のデータを取得
+    const existingRow = data[rowIndex - 1];
+    const now = new Date();
+    
+    // 更新するデータを準備（指定されていない場合は既存の値を使用）
+    const updatedRow = [
+      existingRow[0], // IDは変更しない
+      taskData.title !== undefined ? taskData.title : existingRow[1],
+      taskData.description !== undefined ? taskData.description : existingRow[2],
+      taskData.estimatedHours !== undefined ? parseFloat(taskData.estimatedHours) : existingRow[3],
+      taskData.priority !== undefined ? taskData.priority : existingRow[4],
+      taskData.status !== undefined ? taskData.status : existingRow[5],
+      existingRow[6], // 作成日時は変更しない
+      now.toISOString() // 更新日時を更新
+    ];
+    
+    // 行を更新
+    tasksSheet.getRange(rowIndex, 1, 1, 8).setValues([updatedRow]);
+    
+    return {
+      success: true,
+      id: taskId,
+      message: 'タスクが更新されました'
+    };
+  } catch (error) {
+    Logger.log('Error in updateTask: ' + error.toString());
+    return {
+      error: true,
+      message: error.toString()
+    };
+  }
+}
+
+/**
+ * タスクを削除
+ */
+function deleteTask(taskId) {
+  try {
+    let ss;
+    try {
+      ss = getSpreadsheet();
+    } catch (spreadsheetError) {
+      Logger.log('Failed to get spreadsheet in deleteTask: ' + spreadsheetError.toString());
+      return {
+        error: true,
+        message: 'スプレッドシートを取得できませんでした: ' + spreadsheetError.toString()
+      };
+    }
+    
+    if (!ss) {
+      return {
+        error: true,
+        message: 'スプレッドシートを取得できませんでした（null）'
+      };
+    }
+    
+    let tasksSheet;
+    try {
+      tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
+    } catch (sheetError) {
+      Logger.log('Failed to get sheet by name in deleteTask: ' + sheetError.toString());
+      return {
+        error: true,
+        message: 'タスクシートの取得に失敗しました: ' + sheetError.toString()
+      };
+    }
+    
+    if (!tasksSheet) {
+      return {
+        error: true,
+        message: 'タスクシートが見つかりません'
+      };
+    }
+    
+    const data = tasksSheet.getDataRange().getValues();
+    let rowIndex = -1;
+    
+    // タスクIDで行を検索
+    for (let i = 1; i < data.length; i++) {
+      if (parseInt(data[i][0]) === parseInt(taskId)) {
+        rowIndex = i + 1; // スプレッドシートの行番号は1から始まる
+        break;
+      }
+    }
+    
+    if (rowIndex === -1) {
+      return {
+        error: true,
+        message: 'タスクが見つかりませんでした'
+      };
+    }
+    
+    // 行を削除
+    tasksSheet.deleteRow(rowIndex);
+    
+    return {
+      success: true,
+      id: taskId,
+      message: 'タスクが削除されました'
+    };
+  } catch (error) {
+    Logger.log('Error in deleteTask: ' + error.toString());
+    return {
+      error: true,
+      message: error.toString()
+    };
+  }
+}
+
+/**
+ * タスクのステータスを更新
+ */
+function updateTaskStatus(taskId, status) {
+  return updateTask(taskId, { status: status });
+}
+
+/**
  * Googleカレンダーから今週の会議予定を取得
  */
 function getCalendarEvents() {
@@ -334,6 +523,169 @@ function getCalendarEvents() {
     };
   } catch (error) {
     Logger.log('Error in getCalendarEvents: ' + error.toString());
+    return {
+      error: true,
+      message: error.toString()
+    };
+  }
+}
+
+/**
+ * 体調スコアを記録
+ */
+function recordHealthScore(healthData) {
+  try {
+    let ss;
+    try {
+      ss = getSpreadsheet();
+    } catch (spreadsheetError) {
+      Logger.log('Failed to get spreadsheet in recordHealthScore: ' + spreadsheetError.toString());
+      return {
+        error: true,
+        message: 'スプレッドシートを取得できませんでした: ' + spreadsheetError.toString()
+      };
+    }
+    
+    if (!ss) {
+      return {
+        error: true,
+        message: 'スプレッドシートを取得できませんでした（null）'
+      };
+    }
+    
+    let healthSheet;
+    try {
+      healthSheet = ss.getSheetByName(SHEET_NAME_HEALTH);
+    } catch (sheetError) {
+      Logger.log('Failed to get sheet by name in recordHealthScore: ' + sheetError.toString());
+      return {
+        error: true,
+        message: '体調シートの取得に失敗しました: ' + sheetError.toString()
+      };
+    }
+    
+    // シートが存在しない場合は初期化
+    if (!healthSheet) {
+      initializeSpreadsheet();
+      healthSheet = ss.getSheetByName(SHEET_NAME_HEALTH);
+      if (!healthSheet) {
+        return {
+          error: true,
+          message: '体調シートの作成に失敗しました'
+        };
+      }
+    }
+    
+    const date = healthData.date || new Date().toISOString().split('T')[0];
+    const score = healthData.score || '普通'; // 良い/普通/良くない
+    const memo = healthData.memo || '';
+    const now = new Date();
+    
+    // 同じ日付の記録があるか確認
+    const data = healthSheet.getDataRange().getValues();
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+      const recordDate = data[i][0];
+      if (recordDate && recordDate.toString() === date) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+    
+    const newRow = [
+      date,
+      score,
+      memo,
+      now.toISOString()
+    ];
+    
+    if (rowIndex > 0) {
+      // 既存の記録を更新
+      healthSheet.getRange(rowIndex, 1, 1, 4).setValues([newRow]);
+    } else {
+      // 新しい記録を追加
+      healthSheet.appendRow(newRow);
+    }
+    
+    return {
+      success: true,
+      date: date,
+      message: '体調スコアが記録されました'
+    };
+  } catch (error) {
+    Logger.log('Error in recordHealthScore: ' + error.toString());
+    return {
+      error: true,
+      message: error.toString()
+    };
+  }
+}
+
+/**
+ * 体調スコアを取得
+ */
+function getHealthScores(startDate, endDate) {
+  try {
+    let ss;
+    try {
+      ss = getSpreadsheet();
+    } catch (spreadsheetError) {
+      Logger.log('Failed to get spreadsheet in getHealthScores: ' + spreadsheetError.toString());
+      return {
+        error: true,
+        message: 'スプレッドシートを取得できませんでした: ' + spreadsheetError.toString()
+      };
+    }
+    
+    if (!ss) {
+      return {
+        error: true,
+        message: 'スプレッドシートを取得できませんでした（null）'
+      };
+    }
+    
+    let healthSheet;
+    try {
+      healthSheet = ss.getSheetByName(SHEET_NAME_HEALTH);
+    } catch (sheetError) {
+      Logger.log('Failed to get sheet by name in getHealthScores: ' + sheetError.toString());
+      return {
+        error: true,
+        message: '体調シートの取得に失敗しました: ' + sheetError.toString()
+      };
+    }
+    
+    if (!healthSheet) {
+      return [];
+    }
+    
+    const data = healthSheet.getDataRange().getValues();
+    const healthScores = [];
+    
+    // ヘッダー行をスキップ
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (row[0]) {
+        const recordDate = new Date(row[0]);
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
+        
+        // 日付範囲のフィルタリング
+        if (start && recordDate < start) continue;
+        if (end && recordDate > end) continue;
+        
+        healthScores.push({
+          date: row[0],
+          score: row[1] || '普通',
+          memo: row[2] || '',
+          recordedAt: row[3] || ''
+        });
+      }
+    }
+    
+    return healthScores;
+  } catch (error) {
+    Logger.log('Error in getHealthScores: ' + error.toString());
     return {
       error: true,
       message: error.toString()

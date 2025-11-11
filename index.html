@@ -320,6 +320,162 @@
       font-size: 0.85rem;
       margin-top: 4px;
     }
+    
+    .task-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    
+    .btn-edit, .btn-delete {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn-edit {
+      background: #667eea;
+      color: white;
+    }
+    
+    .btn-edit:hover {
+      background: #5568d3;
+    }
+    
+    .btn-delete {
+      background: #e74c3c;
+      color: white;
+    }
+    
+    .btn-delete:hover {
+      background: #c0392b;
+    }
+    
+    .task-status-select {
+      padding: 4px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    
+    .badge-status-completed {
+      background: #e8f5e9;
+      color: #27ae60;
+    }
+    
+    .badge-status-in-progress {
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+    
+    .badge-status-cancelled {
+      background: #f5f5f5;
+      color: #666;
+    }
+    
+    .badge-status-pending {
+      background: #fff4e6;
+      color: #f39c12;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+    
+    .modal-content {
+      background-color: white;
+      margin: 5% auto;
+      padding: 30px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .modal-header h2 {
+      color: #667eea;
+      margin: 0;
+    }
+    
+    .close {
+      color: #aaa;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    
+    .close:hover {
+      color: #000;
+    }
+    
+    .health-form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    
+    .health-score-buttons {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .health-score-btn {
+      flex: 1;
+      padding: 15px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    
+    .health-score-btn:hover {
+      border-color: #667eea;
+    }
+    
+    .health-score-btn.selected {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+    
+    .health-score-btn.good {
+      border-color: #27ae60;
+    }
+    
+    .health-score-btn.good.selected {
+      background: #27ae60;
+      border-color: #27ae60;
+    }
+    
+    .health-score-btn.bad {
+      border-color: #e74c3c;
+    }
+    
+    .health-score-btn.bad.selected {
+      background: #e74c3c;
+      border-color: #e74c3c;
+    }
   </style>
 </head>
 <body>
@@ -385,6 +541,63 @@
         <div class="loading">読み込み中...</div>
       </div>
     </div>
+    
+    <div class="card" style="margin-top: 20px;">
+      <h2>💚 体調記録</h2>
+      <form id="health-form" class="health-form">
+        <div class="form-group">
+          <label>今日の体調</label>
+          <div class="health-score-buttons">
+            <button type="button" class="health-score-btn good" data-score="良い" onclick="selectHealthScore('良い', this)">良い</button>
+            <button type="button" class="health-score-btn" data-score="普通" onclick="selectHealthScore('普通', this)">普通</button>
+            <button type="button" class="health-score-btn bad" data-score="良くない" onclick="selectHealthScore('良くない', this)">良くない</button>
+          </div>
+          <input type="hidden" id="health-score" name="score" required>
+        </div>
+        <div class="form-group">
+          <label for="health-memo">メモ（任意）</label>
+          <textarea id="health-memo" name="memo" rows="3"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">体調を記録</button>
+      </form>
+    </div>
+  </div>
+  
+  <!-- タスク編集モーダル -->
+  <div id="edit-task-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>タスクを編集</h2>
+        <span class="close" onclick="closeEditModal()">&times;</span>
+      </div>
+      <form id="edit-task-form" class="task-form">
+        <input type="hidden" id="edit-task-id">
+        <div class="form-group">
+          <label for="edit-task-title">タイトル *</label>
+          <input type="text" id="edit-task-title" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-task-description">説明</label>
+          <textarea id="edit-task-description"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="edit-task-hours">見積もり時間（時間） *</label>
+          <input type="number" id="edit-task-hours" step="0.5" min="0" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-task-priority">優先度</label>
+          <select id="edit-task-priority">
+            <option value="高">高</option>
+            <option value="中">中</option>
+            <option value="低">低</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;">更新</button>
+          <button type="button" class="btn" onclick="closeEditModal()" style="flex: 1; background: #e0e0e0;">キャンセル</button>
+        </div>
+      </form>
+    </div>
   </div>
   
   <script>
@@ -426,17 +639,28 @@
       tasks.forEach(task => {
         const priorityClass = `priority-${task.priority === '高' ? 'high' : task.priority === '中' ? 'medium' : 'low'}`;
         const badgeClass = `badge-priority-${task.priority === '高' ? 'high' : task.priority === '中' ? 'medium' : 'low'}`;
+        const statusClass = `badge-status-${task.status === '完了' ? 'completed' : task.status === '進行中' ? 'in-progress' : task.status === 'キャンセル' ? 'cancelled' : 'pending'}`;
         
         html += `
-          <div class="task-item ${priorityClass}">
+          <div class="task-item ${priorityClass}" data-task-id="${task.id}">
             <div class="task-header">
               <div class="task-title">${escapeHtml(task.title)}</div>
               <div class="task-meta">
+                <select class="task-status-select" onchange="updateTaskStatus(${task.id}, this.value)">
+                  <option value="未着手" ${task.status === '未着手' ? 'selected' : ''}>未着手</option>
+                  <option value="進行中" ${task.status === '進行中' ? 'selected' : ''}>進行中</option>
+                  <option value="完了" ${task.status === '完了' ? 'selected' : ''}>完了</option>
+                  <option value="キャンセル" ${task.status === 'キャンセル' ? 'selected' : ''}>キャンセル</option>
+                </select>
                 <span class="badge ${badgeClass}">${escapeHtml(task.priority)}</span>
                 <span class="badge badge-hours">${task.estimatedHours}時間</span>
               </div>
             </div>
             ${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}
+            <div class="task-actions">
+              <button class="btn-edit" onclick="editTask(${task.id})">編集</button>
+              <button class="btn-delete" onclick="deleteTask(${task.id})">削除</button>
+            </div>
           </div>
         `;
       });
@@ -574,6 +798,155 @@
       div.textContent = text;
       return div.innerHTML;
     }
+    
+    // タスクの編集
+    function editTask(taskId) {
+      // タスクデータを取得
+      google.script.run
+        .withSuccessHandler(function(tasks) {
+          if (tasks.error) {
+            alert('エラー: ' + tasks.message);
+            return;
+          }
+          
+          const task = tasks.find(t => t.id === taskId);
+          if (!task) {
+            alert('タスクが見つかりません');
+            return;
+          }
+          
+          // モーダルにデータを設定
+          document.getElementById('edit-task-id').value = task.id;
+          document.getElementById('edit-task-title').value = task.title;
+          document.getElementById('edit-task-description').value = task.description || '';
+          document.getElementById('edit-task-hours').value = task.estimatedHours;
+          document.getElementById('edit-task-priority').value = task.priority;
+          
+          // モーダルを表示
+          document.getElementById('edit-task-modal').style.display = 'block';
+        })
+        .withFailureHandler(showError)
+        .getTasks();
+    }
+    
+    // タスク編集フォームの送信
+    document.getElementById('edit-task-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const taskId = document.getElementById('edit-task-id').value;
+      const taskData = {
+        title: document.getElementById('edit-task-title').value,
+        description: document.getElementById('edit-task-description').value,
+        estimatedHours: document.getElementById('edit-task-hours').value,
+        priority: document.getElementById('edit-task-priority').value
+      };
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.error) {
+            alert('エラー: ' + result.message);
+          } else {
+            alert('タスクが更新されました！');
+            closeEditModal();
+            loadData(); // データを再読み込み
+          }
+        })
+        .withFailureHandler(showError)
+        .updateTask(taskId, taskData);
+    });
+    
+    // モーダルを閉じる
+    function closeEditModal() {
+      document.getElementById('edit-task-modal').style.display = 'none';
+    }
+    
+    // モーダルの外側をクリックで閉じる
+    window.onclick = function(event) {
+      const modal = document.getElementById('edit-task-modal');
+      if (event.target === modal) {
+        closeEditModal();
+      }
+    }
+    
+    // タスクの削除
+    function deleteTask(taskId) {
+      if (!confirm('このタスクを削除しますか？')) {
+        return;
+      }
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.error) {
+            alert('エラー: ' + result.message);
+          } else {
+            alert('タスクが削除されました！');
+            loadData(); // データを再読み込み
+          }
+        })
+        .withFailureHandler(showError)
+        .deleteTask(taskId);
+    }
+    
+    // タスクのステータスを更新
+    function updateTaskStatus(taskId, status) {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.error) {
+            alert('エラー: ' + result.message);
+            loadTasks(); // エラー時は再読み込み
+          } else {
+            loadData(); // データを再読み込み
+          }
+        })
+        .withFailureHandler(showError)
+        .updateTaskStatus(taskId, status);
+    }
+    
+    // 体調スコアを選択
+    function selectHealthScore(score, button) {
+      // すべてのボタンからselectedクラスを削除
+      document.querySelectorAll('.health-score-btn').forEach(btn => {
+        btn.classList.remove('selected');
+      });
+      
+      // 選択したボタンにselectedクラスを追加
+      button.classList.add('selected');
+      
+      // 隠しフィールドに値を設定
+      document.getElementById('health-score').value = score;
+    }
+    
+    // 体調記録フォームの送信
+    document.getElementById('health-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const score = document.getElementById('health-score').value;
+      if (!score) {
+        alert('体調スコアを選択してください');
+        return;
+      }
+      
+      const healthData = {
+        date: new Date().toISOString().split('T')[0],
+        score: score,
+        memo: document.getElementById('health-memo').value
+      };
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.error) {
+            alert('エラー: ' + result.message);
+          } else {
+            alert('体調が記録されました！');
+            document.getElementById('health-form').reset();
+            document.querySelectorAll('.health-score-btn').forEach(btn => {
+              btn.classList.remove('selected');
+            });
+          }
+        })
+        .withFailureHandler(showError)
+        .recordHealthScore(healthData);
+    });
   </script>
 </body>
 </html>
