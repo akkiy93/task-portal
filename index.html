@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>タスク管理ポータル</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: #333;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .header h1 {
+      color: #667eea;
+      margin-bottom: 10px;
+      font-size: 2rem;
+    }
+    
+    .workload-card {
+      background: white;
+      border-radius: 12px;
+      padding: 25px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .workload-card h2 {
+      color: #667eea;
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+    }
+    
+    .workload-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .stat-item {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    
+    .stat-label {
+      font-size: 0.9rem;
+      color: #666;
+      margin-bottom: 5px;
+    }
+    
+    .stat-value {
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .stat-value.high {
+      color: #e74c3c;
+    }
+    
+    .stat-value.medium {
+      color: #f39c12;
+    }
+    
+    .stat-value.low {
+      color: #27ae60;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 30px;
+      background: #e0e0e0;
+      border-radius: 15px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #27ae60, #f39c12, #e74c3c);
+      transition: width 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+    
+    .main-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    
+    @media (max-width: 768px) {
+      .main-content {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 25px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .card h2 {
+      color: #667eea;
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+    }
+    
+    .task-form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    
+    .form-group label {
+      font-weight: 600;
+      color: #555;
+      font-size: 0.9rem;
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      padding: 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 1rem;
+      transition: border-color 0.3s;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+    
+    .task-list {
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    
+    .task-item {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      border-left: 4px solid #667eea;
+      transition: transform 0.2s;
+    }
+    
+    .task-item:hover {
+      transform: translateX(5px);
+    }
+    
+    .task-item.priority-high {
+      border-left-color: #e74c3c;
+    }
+    
+    .task-item.priority-medium {
+      border-left-color: #f39c12;
+    }
+    
+    .task-item.priority-low {
+      border-left-color: #27ae60;
+    }
+    
+    .task-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 8px;
+    }
+    
+    .task-title {
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: #333;
+    }
+    
+    .task-meta {
+      display: flex;
+      gap: 10px;
+      font-size: 0.85rem;
+      color: #666;
+    }
+    
+    .task-description {
+      color: #555;
+      margin-top: 8px;
+      font-size: 0.9rem;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    
+    .badge-priority-high {
+      background: #fee;
+      color: #e74c3c;
+    }
+    
+    .badge-priority-medium {
+      background: #fff4e6;
+      color: #f39c12;
+    }
+    
+    .badge-priority-low {
+      background: #e8f5e9;
+      color: #27ae60;
+    }
+    
+    .badge-hours {
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+    }
+    
+    .error {
+      background: #fee;
+      color: #e74c3c;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+    
+    .calendar-events {
+      margin-top: 15px;
+    }
+    
+    .calendar-event {
+      background: #f0f4ff;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+    }
+    
+    .calendar-event-title {
+      font-weight: 600;
+      color: #667eea;
+    }
+    
+    .calendar-event-time {
+      color: #666;
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📋 タスク管理ポータル</h1>
+      <p>あなたのタスクと労働時間を可視化</p>
+    </div>
+    
+    <div class="workload-card">
+      <h2>📊 今週の労働負荷</h2>
+      <div id="workload-stats" class="workload-stats">
+        <div class="loading">読み込み中...</div>
+      </div>
+      <div id="workload-progress" class="progress-bar" style="display: none;">
+        <div class="progress-fill" style="width: 0%;">0%</div>
+      </div>
+    </div>
+    
+    <div class="main-content">
+      <div class="card">
+        <h2>➕ タスクを追加</h2>
+        <form id="task-form" class="task-form">
+          <div class="form-group">
+            <label for="task-title">タイトル *</label>
+            <input type="text" id="task-title" name="title" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="task-description">説明</label>
+            <textarea id="task-description" name="description"></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label for="task-hours">見積もり時間（時間） *</label>
+            <input type="number" id="task-hours" name="estimatedHours" step="0.5" min="0" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="task-priority">優先度</label>
+            <select id="task-priority" name="priority">
+              <option value="高">高</option>
+              <option value="中" selected>中</option>
+              <option value="低">低</option>
+            </select>
+          </div>
+          
+          <button type="submit" class="btn btn-primary">タスクを追加</button>
+        </form>
+      </div>
+      
+      <div class="card">
+        <h2>📝 タスク一覧</h2>
+        <div id="task-list" class="task-list">
+          <div class="loading">読み込み中...</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card" style="margin-top: 20px;">
+      <h2>📅 今週の会議予定</h2>
+      <div id="calendar-events" class="calendar-events">
+        <div class="loading">読み込み中...</div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // ページ読み込み時にデータを取得
+    window.onload = function() {
+      loadData();
+    };
+    
+    // データを読み込む
+    function loadData() {
+      loadTasks();
+      loadWorkload();
+      loadCalendarEvents();
+    }
+    
+    // タスク一覧を読み込む
+    function loadTasks() {
+      google.script.run
+        .withSuccessHandler(displayTasks)
+        .withFailureHandler(showError)
+        .getTasks();
+    }
+    
+    // タスク一覧を表示
+    function displayTasks(tasks) {
+      const taskList = document.getElementById('task-list');
+      
+      if (tasks.error) {
+        taskList.innerHTML = '<div class="error">エラー: ' + tasks.message + '</div>';
+        return;
+      }
+      
+      if (tasks.length === 0) {
+        taskList.innerHTML = '<div class="loading">タスクがありません</div>';
+        return;
+      }
+      
+      let html = '';
+      tasks.forEach(task => {
+        const priorityClass = `priority-${task.priority === '高' ? 'high' : task.priority === '中' ? 'medium' : 'low'}`;
+        const badgeClass = `badge-priority-${task.priority === '高' ? 'high' : task.priority === '中' ? 'medium' : 'low'}`;
+        
+        html += `
+          <div class="task-item ${priorityClass}">
+            <div class="task-header">
+              <div class="task-title">${escapeHtml(task.title)}</div>
+              <div class="task-meta">
+                <span class="badge ${badgeClass}">${escapeHtml(task.priority)}</span>
+                <span class="badge badge-hours">${task.estimatedHours}時間</span>
+              </div>
+            </div>
+            ${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}
+          </div>
+        `;
+      });
+      
+      taskList.innerHTML = html;
+    }
+    
+    // 労働負荷を読み込む
+    function loadWorkload() {
+      google.script.run
+        .withSuccessHandler(displayWorkload)
+        .withFailureHandler(showError)
+        .getWeeklyWorkload();
+    }
+    
+    // 労働負荷を表示
+    function displayWorkload(data) {
+      const statsContainer = document.getElementById('workload-stats');
+      const progressBar = document.getElementById('workload-progress');
+      
+      if (data.error) {
+        statsContainer.innerHTML = '<div class="error">エラー: ' + data.message + '</div>';
+        return;
+      }
+      
+      const utilizationRate = Math.round(data.utilizationRate);
+      const progressClass = utilizationRate >= 100 ? 'high' : utilizationRate >= 80 ? 'medium' : 'low';
+      
+      statsContainer.innerHTML = `
+        <div class="stat-item">
+          <div class="stat-label">タスク時間</div>
+          <div class="stat-value">${data.totalTaskHours.toFixed(1)}時間</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">会議時間</div>
+          <div class="stat-value">${data.meetingHours.toFixed(1)}時間</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">合計時間</div>
+          <div class="stat-value ${progressClass}">${data.totalHours.toFixed(1)}時間</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">余力</div>
+          <div class="stat-value ${data.availableHours < 0 ? 'high' : data.availableHours < 10 ? 'medium' : 'low'}">
+            ${data.availableHours >= 0 ? data.availableHours.toFixed(1) : '超過'}時間
+          </div>
+        </div>
+      `;
+      
+      // プログレスバーを更新
+      const progressFill = progressBar.querySelector('.progress-fill');
+      const progressWidth = Math.min(utilizationRate, 100);
+      progressFill.style.width = progressWidth + '%';
+      progressFill.textContent = utilizationRate + '%';
+      progressBar.style.display = 'block';
+    }
+    
+    // カレンダーイベントを読み込む
+    function loadCalendarEvents() {
+      google.script.run
+        .withSuccessHandler(displayCalendarEvents)
+        .withFailureHandler(showError)
+        .getCalendarEvents();
+    }
+    
+    // カレンダーイベントを表示
+    function displayCalendarEvents(data) {
+      const calendarContainer = document.getElementById('calendar-events');
+      
+      if (data.error) {
+        calendarContainer.innerHTML = '<div class="error">エラー: ' + data.message + '</div>';
+        return;
+      }
+      
+      if (!data.events || data.events.length === 0) {
+        calendarContainer.innerHTML = '<div class="loading">今週の会議予定はありません</div>';
+        return;
+      }
+      
+      let html = '';
+      data.events.forEach(event => {
+        const startDate = new Date(event.startTime);
+        const endDate = new Date(event.endTime);
+        const dateStr = startDate.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+        const timeStr = startDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) + 
+                       ' - ' + 
+                       endDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        
+        html += `
+          <div class="calendar-event">
+            <div class="calendar-event-title">${escapeHtml(event.title)}</div>
+            <div class="calendar-event-time">${dateStr} ${timeStr} (${event.duration.toFixed(1)}時間)</div>
+          </div>
+        `;
+      });
+      
+      calendarContainer.innerHTML = html;
+    }
+    
+    // タスク追加フォームの処理
+    document.getElementById('task-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const formData = {
+        title: document.getElementById('task-title').value,
+        description: document.getElementById('task-description').value,
+        estimatedHours: document.getElementById('task-hours').value,
+        priority: document.getElementById('task-priority').value,
+        status: '未着手'
+      };
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.error) {
+            alert('エラー: ' + result.message);
+          } else {
+            alert('タスクが追加されました！');
+            document.getElementById('task-form').reset();
+            loadData(); // データを再読み込み
+          }
+        })
+        .withFailureHandler(showError)
+        .addTask(formData);
+    });
+    
+    // エラー表示
+    function showError(error) {
+      console.error('Error:', error);
+      alert('エラーが発生しました: ' + error.message);
+    }
+    
+    // HTMLエスケープ
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
+
