@@ -105,7 +105,7 @@ clasp deploy --description "初回デプロイ"
 clasp deploy --deploymentId YOUR_DEPLOYMENT_ID --description "更新内容"
 ```
 
-詳細は [WEBAPP_DEPLOY.md](./WEBAPP_DEPLOY.md) を参照してください。
+詳細は [docs/WEBAPP_DEPLOY.md](./docs/WEBAPP_DEPLOY.md) を参照してください。
 
 ## 使い方
 
@@ -141,7 +141,26 @@ clasp deploy --deploymentId YOUR_DEPLOYMENT_ID --description "更新内容"
 
 ## トラブルシューティング
 
-詳細は [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) を参照してください。
+詳細は [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) を参照してください。
+
+## プロジェクト構成
+
+```
+task-portal/
+├── Code.gs              # GASバックエンドコード
+├── index.html           # フロントエンドUI
+├── appsscript.json      # GASマニフェスト
+├── README.md            # プロジェクト概要
+├── docs/                # ドキュメント
+│   ├── README.md        # ドキュメント一覧
+│   ├── SETUP_GUIDE.md   # セットアップ手順
+│   ├── DEPLOYMENT.md    # デプロイ手順
+│   └── ...              # その他のドキュメント
+└── issues/              # イシュー関連ファイル
+    ├── issue4_ja.md     # Issue #4: UI改善
+    ├── issue5_ja.md     # Issue #5: 機能追加
+    └── issue6_ja.md     # Issue #6: バグ修正
+```
 
 ## ライセンス
 
