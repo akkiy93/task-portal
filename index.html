@@ -966,14 +966,14 @@
         return;
       }
       
-      // ボタンを無効化（モーダルが開くまで）
-      if (buttonElement) {
-        setButtonLoading(buttonElement, true, '読み込み中...');
+      // ボタンが既に無効化されている場合は何もしない
+      if (buttonElement && buttonElement.disabled) {
+        return;
       }
       
       // タスクデータを取得
       callGasWithLoading(buttonElement, function(enableButton) {
-        return google.script.run
+        const gasCall = google.script.run
           .withSuccessHandler(function(tasks) {
             enableButton(); // 処理完了後に再有効化
             if (tasks.error) {
@@ -1002,6 +1002,8 @@
             showError(error);
           })
           .getTasks();
+        
+        return gasCall;
       }, { loadingText: '読み込み中...' });
     }
     
