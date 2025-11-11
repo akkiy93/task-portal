@@ -784,6 +784,7 @@
             <button type="button" class="health-score-btn bad" data-score="良くない" onclick="selectReportHealthScore('良くない', this)">良くない</button>
           </div>
           <input type="hidden" id="report-health-score" name="healthScore">
+          <small style="color: #666; font-size: 0.85rem; display: block; margin-top: 5px;">※ 出社時体調はヘッダーの「現在の体調」ボタンで記録してください</small>
         </div>
         <div class="form-group">
           <label>今日完了したタスク</label>
@@ -1063,25 +1064,21 @@
         .recordHealthScore(healthData);
     }
     
-    // 今日の体調を読み込む
+    // 今日の体調を読み込む（日報シートから）
     function loadTodayHealth() {
       const today = new Date().toISOString().split('T')[0];
       callGasWithLoading(null, function(enableButton) {
         return google.script.run
-          .withSuccessHandler(function(healthData) {
+          .withSuccessHandler(function(report) {
             enableButton();
-            if (healthData && !healthData.error && Array.isArray(healthData) && healthData.length > 0) {
-              // 最新の記録を取得
-              const latest = healthData[healthData.length - 1];
-              if (latest && latest.score) {
-                // 該当するボタンを選択状態にする
-                const button = document.querySelector(`.health-status-btn[data-score="${latest.score}"]`);
-                if (button) {
-                  document.querySelectorAll('.health-status-btn').forEach(btn => {
-                    btn.classList.remove('selected');
-                  });
-                  button.classList.add('selected');
-                }
+            if (report && !report.error && report.arrivalHealthScore) {
+              // 出社時体調を取得してボタンを選択状態にする
+              const button = document.querySelector(`.health-status-btn[data-score="${report.arrivalHealthScore}"]`);
+              if (button) {
+                document.querySelectorAll('.health-status-btn').forEach(btn => {
+                  btn.classList.remove('selected');
+                });
+                button.classList.add('selected');
               }
             }
           })
@@ -1089,10 +1086,9 @@
             enableButton();
             // エラーは無視（体調が未記録の場合もある）
           })
-          .getHealthScores(today, today);
+          .getDailyReport(today);
       });
     }
-    
     // データを読み込む
     function loadData() {
       loadTasks();

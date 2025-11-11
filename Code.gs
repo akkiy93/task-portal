@@ -13,7 +13,6 @@
 // スプレッドシートの設定
 const SHEET_NAME_TASKS = 'タスク';
 const SHEET_NAME_CALENDAR = 'カレンダー';
-const SHEET_NAME_HEALTH = '体調';
 const SHEET_NAME_REPORT = '日報';
 
 /**
@@ -119,18 +118,6 @@ function initializeSpreadsheet() {
     tasksSheet.setFrozenRows(1);
   }
   
-  // 体調シートの作成
-  let healthSheet = ss.getSheetByName(SHEET_NAME_HEALTH);
-  if (!healthSheet) {
-    healthSheet = ss.insertSheet(SHEET_NAME_HEALTH);
-    // ヘッダー行を設定
-    healthSheet.getRange(1, 1, 1, 4).setValues([[
-      '日付', '体調スコア', 'メモ', '記録日時'
-    ]]);
-    healthSheet.getRange(1, 1, 1, 4).setFontWeight('bold');
-    healthSheet.setFrozenRows(1);
-  }
-  
   // 日報シートの作成
   let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
   if (!reportSheet) {
@@ -143,21 +130,67 @@ function initializeSpreadsheet() {
     reportSheet.setFrozenRows(1);
   } else {
     // 既存のシートがある場合、列数を確認して必要に応じて更新
-    const headers = reportSheet.getRange(1, 1, 1, reportSheet.getLastColumn()).getValues()[0];
-    if (headers.length < 9 || headers[2] !== '出社時体調' || headers[3] !== '退社時体調') {
-      // 古い形式の場合は列を追加
-      if (headers.length === 8 && headers[2] === '体調スコア') {
-        // 体調スコア列を出社時体調と退社時体調に分割
-        reportSheet.insertColumnAfter(3); // 3列目の後に列を挿入
-        reportSheet.getRange(1, 3).setValue('出社時体調');
-        reportSheet.getRange(1, 4).setValue('退社時体調');
-        // 既存の体調スコアデータを出社時体調に移動（退社時体調は空）
-        const lastRow = reportSheet.getLastRow();
+    const lastColumn = reportSheet.getLastColumn();
+    const headers = reportSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+    
+    // 古い形式（8列で「体調スコア」が3列目）の場合は列を更新
+    if (lastColumn === 8 && headers[2] === '体調スコア') {
+      // 3列目（体調スコア）の後に列を挿入
+      reportSheet.insertColumnAfter(3);
+      
+      // ヘッダーを更新
+      reportSheet.getRange(1, 3).setValue('出社時体調');
+      reportSheet.getRange(1, 4).setValue('退社時体調');
+      
+      // 既存の体調スコアデータを出社時体調に移動
+      const lastRow = reportSheet.getLastRow();
+      if (lastRow > 1) {
+        // 3列目（旧体調スコア）のデータを取得
+        const oldHealthData = reportSheet.getRange(2, 3, lastRow - 1, 1).getValues();
+        // 出社時体調（3列目）に既存データを設定
+        reportSheet.getRange(2, 3, lastRow - 1, 1).setValues(oldHealthData);
+        // 退社時体調（4列目）は空にする
+        reportSheet.getRange(2, 4, lastRow - 1, 1).setValue('');
+        
+        // 以降の列を1つ右にシフト
+        // 完了タスク数（4→5列目）
         if (lastRow > 1) {
-          const oldHealthData = reportSheet.getRange(2, 3, lastRow - 1, 1).getValues();
-          reportSheet.getRange(2, 3, lastRow - 1, 1).setValues(oldHealthData);
-          reportSheet.getRange(2, 4, lastRow - 1, 1).setValue(''); // 退社時体調は空
+          const taskCountData = reportSheet.getRange(2, 4, lastRow - 1, 1).getValues();
+          reportSheet.getRange(2, 5, lastRow - 1, 1).setValues(taskCountData);
         }
+        // 完了タスク時間合計（5→6列目）
+        if (lastRow > 1) {
+          const taskHoursData = reportSheet.getRange(2, 5, lastRow - 1, 1).getValues();
+          reportSheet.getRange(2, 6, lastRow - 1, 1).setValues(taskHoursData);
+        }
+        // 振り返り（6→7列目）
+        if (lastRow > 1) {
+          const reflectionData = reportSheet.getRange(2, 6, lastRow - 1, 1).getValues();
+          reportSheet.getRange(2, 7, lastRow - 1, 1).setValues(reflectionData);
+        }
+        // 明日の予定（7→8列目）
+        if (lastRow > 1) {
+          const tomorrowPlanData = reportSheet.getRange(2, 7, lastRow - 1, 1).getValues();
+          reportSheet.getRange(2, 8, lastRow - 1, 1).setValues(tomorrowPlanData);
+        }
+        // 記録日時（8→9列目）
+        if (lastRow > 1) {
+          const recordDateData = reportSheet.getRange(2, 8, lastRow - 1, 1).getValues();
+          reportSheet.getRange(2, 9, lastRow - 1, 1).setValues(recordDateData);
+        }
+      }
+    } else if (lastColumn < 9 || headers[2] !== '出社時体調' || headers[3] !== '退社時体調') {
+      // その他の古い形式の場合も対応
+      // ヘッダーを直接更新
+      if (lastColumn >= 3) {
+        reportSheet.getRange(1, 3).setValue('出社時体調');
+      }
+      if (lastColumn >= 4) {
+        reportSheet.getRange(1, 4).setValue('退社時体調');
+      } else if (lastColumn === 3) {
+        // 3列しかない場合は列を追加
+        reportSheet.insertColumnAfter(3);
+        reportSheet.getRange(1, 4).setValue('退社時体調');
       }
     }
   }
@@ -636,44 +669,6 @@ function recordHealthScore(healthData) {
       }
     }
     
-    // 体調シートにも記録（後方互換性のため）
-    let healthSheet;
-    try {
-      healthSheet = ss.getSheetByName(SHEET_NAME_HEALTH);
-    } catch (sheetError) {
-      Logger.log('Failed to get sheet by name in recordHealthScore: ' + sheetError.toString());
-    }
-    
-    if (healthSheet) {
-      const memo = healthData.memo || '';
-      const now = new Date();
-      
-      // 同じ日付の記録があるか確認
-      const data = healthSheet.getDataRange().getValues();
-      let rowIndex = -1;
-      for (let i = 1; i < data.length; i++) {
-        const recordDate = data[i][0];
-        if (recordDate && recordDate.toString() === date) {
-          rowIndex = i + 1;
-          break;
-        }
-      }
-      
-      const newRow = [
-        date,
-        score,
-        memo,
-        now.toISOString()
-      ];
-      
-      if (rowIndex > 0) {
-        // 既存の記録を更新
-        healthSheet.getRange(rowIndex, 1, 1, 4).setValues([newRow]);
-      } else {
-        // 新しい記録を追加
-        healthSheet.appendRow(newRow);
-      }
-    }
     
     return {
       success: true,
@@ -1016,6 +1011,48 @@ function recordDailyReport(reportData) {
           error: true,
           message: '日報シートが見つかりません。初期化を実行してください。'
         };
+      }
+    } else {
+      // 既存のシートがある場合、列構成を確認して必要に応じて更新
+      const lastColumn = reportSheet.getLastColumn();
+      const headers = reportSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+      
+      // 古い形式（8列で「体調スコア」が3列目）の場合は列を更新
+      if (lastColumn === 8 && headers[2] === '体調スコア') {
+        // 3列目（体調スコア）の後に列を挿入
+        reportSheet.insertColumnAfter(3);
+        
+        // ヘッダーを更新
+        reportSheet.getRange(1, 3).setValue('出社時体調');
+        reportSheet.getRange(1, 4).setValue('退社時体調');
+        
+        // 既存の体調スコアデータを出社時体調に移動
+        const lastRow = reportSheet.getLastRow();
+        if (lastRow > 1) {
+          // 3列目（旧体調スコア）のデータを取得
+          const oldHealthData = reportSheet.getRange(2, 3, lastRow - 1, 1).getValues();
+          // 出社時体調（3列目）に既存データを設定
+          reportSheet.getRange(2, 3, lastRow - 1, 1).setValues(oldHealthData);
+          // 退社時体調（4列目）は空にする
+          reportSheet.getRange(2, 4, lastRow - 1, 1).setValue('');
+          
+          // 以降の列を1つ右にシフト
+          // 完了タスク数（4→5列目）
+          const taskCountData = reportSheet.getRange(2, 4, lastRow - 1, 1).getValues();
+          reportSheet.getRange(2, 5, lastRow - 1, 1).setValues(taskCountData);
+          // 完了タスク時間合計（5→6列目）
+          const taskHoursData = reportSheet.getRange(2, 5, lastRow - 1, 1).getValues();
+          reportSheet.getRange(2, 6, lastRow - 1, 1).setValues(taskHoursData);
+          // 振り返り（6→7列目）
+          const reflectionData = reportSheet.getRange(2, 6, lastRow - 1, 1).getValues();
+          reportSheet.getRange(2, 7, lastRow - 1, 1).setValues(reflectionData);
+          // 明日の予定（7→8列目）
+          const tomorrowPlanData = reportSheet.getRange(2, 7, lastRow - 1, 1).getValues();
+          reportSheet.getRange(2, 8, lastRow - 1, 1).setValues(tomorrowPlanData);
+          // 記録日時（8→9列目）
+          const recordDateData = reportSheet.getRange(2, 8, lastRow - 1, 1).getValues();
+          reportSheet.getRange(2, 9, lastRow - 1, 1).setValues(recordDateData);
+        }
       }
     }
     
