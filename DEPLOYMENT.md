@@ -56,7 +56,7 @@ function getSpreadsheet() {
 ## 🔗 リンク
 
 - **GASエディタ**: https://script.google.com/d/1OZNbk3v9kgRPDPvsLlaShtG1DhCfMCYdtpnXaRqbX1nqtKS_11ETpPQ_/edit
-- **デプロイID**: `AKfycbw8M8_lsspP-TgogdSNZoeZaxnBR2tdlg6taDckEkN46m9hfWQ6q60UVDhD88SaPzsb`
+- **デプロイID**: デプロイ時に生成されるIDを使用
 
 ## 📝 注意事項
 

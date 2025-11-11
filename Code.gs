@@ -12,10 +12,23 @@
 const SHEET_NAME_TASKS = 'タスク';
 const SHEET_NAME_CALENDAR = 'カレンダー';
 
-// スプレッドシートID（定数として定義）
-// 注意: デプロイ時は、実際のスプレッドシートIDに置き換えてください
-// スプレッドシートのURLからIDを取得: https://docs.google.com/spreadsheets/d/[SPREADSHEET_ID]/edit
-const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
+/**
+ * スプレッドシートIDを取得
+ * スクリプトプロパティから取得し、設定されていない場合はデフォルト値を使用
+ */
+function getSpreadsheetId() {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  let spreadsheetId = scriptProperties.getProperty('SPREADSHEET_ID');
+  
+  // スクリプトプロパティに設定されていない場合は、デフォルト値を使用
+  // 初回セットアップ時は、GASエディタでスクリプトプロパティを設定してください
+  if (!spreadsheetId) {
+    spreadsheetId = 'YOUR_SPREADSHEET_ID_HERE';
+    Logger.log('Warning: SPREADSHEET_ID is not set in script properties. Using default value.');
+  }
+  
+  return spreadsheetId;
+}
 
 /**
  * アクティブなスプレッドシートを取得
@@ -23,6 +36,8 @@ const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
  */
 function getSpreadsheet() {
   try {
+    const SPREADSHEET_ID = getSpreadsheetId();
+    
     // まず、アクティブなスプレッドシートを試す（開発時のみ有効）
     let ss = null;
     try {
@@ -58,6 +73,7 @@ function getSpreadsheet() {
     Logger.log('Spreadsheet opened successfully. ID: ' + testId);
     return ss;
   } catch (e) {
+    const SPREADSHEET_ID = getSpreadsheetId();
     const errorMsg = 'スプレッドシートの取得に失敗しました。ID: ' + SPREADSHEET_ID + ', エラー: ' + e.toString();
     Logger.log(errorMsg);
     Logger.log('Error stack: ' + (e.stack || 'No stack trace'));

@@ -5,7 +5,7 @@
 - ✅ Claspのインストールとログイン
 - ✅ GASプロジェクトの作成
 - ✅ コードのプッシュ
-- ✅ スプレッドシートIDの設定（`1mB9nhSma1jiUOhjQpN2Ae9Ib8unc_Ixq6WAEY3geydU`）
+- ✅ スプレッドシートIDの設定（スクリプトプロパティに設定）
 
 ## 📋 次のステップ（手動で実行）
 
@@ -16,7 +16,7 @@
 3. 「実行」ボタン（▶）をクリック
 4. 初回実行時は承認が必要です：
    - 「権限を確認」をクリック
-   - Googleアカウントを選択（`ariibu03@gmail.com`）
+   - Googleアカウントを選択
    - 「詳細」→「タスク管理ポータル（安全ではないページ）に移動」をクリック
    - 「許可」をクリック
 5. 実行が成功すると、スプレッドシートに「タスク」シートが作成されます
@@ -39,8 +39,7 @@
 ## 🔗 リンク
 
 - **GASエディタ**: https://script.google.com/d/1OZNbk3v9kgRPDPvsLlaShtG1DhCfMCYdtpnXaRqbX1nqtKS_11ETpPQ_/edit
-- **スプレッドシート**: https://docs.google.com/spreadsheets/d/1mB9nhSma1jiUOhjQpN2Ae9Ib8unc_Ixq6WAEY3geydU/edit
-- **デプロイID**: `AKfycbw8M8_lsspP-TgogdSNZoeZaxnBR2tdlg6taDckEkN46m9hfWQ6q60UVDhD88SaPzsb`
+- **スプレッドシート**: スクリプトプロパティで設定したIDのスプレッドシート
 
 ## 🧪 動作確認
 

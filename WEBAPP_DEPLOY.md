@@ -13,7 +13,7 @@
 
 1. [GASエディタ](https://script.google.com/d/1OZNbk3v9kgRPDPvsLlaShtG1DhCfMCYdtpnXaRqbX1nqtKS_11ETpPQ_/edit) を開く
 2. 「デプロイ」→「デプロイを管理」をクリック
-3. 最新のデプロイ（バージョン6、ID: `AKfycbyoddze_Hz2QGVWs18niDmuouEIX_3R9JmxGc-5tRg0QW4ZQg5qd8roNgzJSG_mgs8`）を選択
+3. 最新のデプロイを選択
 4. 「編集」をクリック
 5. 歯車アイコン（⚙️）をクリックして「種類の選択」を開く
 6. **「ウェブアプリ」を選択**
@@ -36,7 +36,7 @@ https://script.google.com/macros/s/[DEPLOYMENT_ID]/exec
 今後、コードを更新して既存のウェブアプリデプロイを更新する場合は：
 
 ```bash
-clasp deploy --deploymentId AKfycbyoddze_Hz2QGVWs18niDmuouEIX_3R9JmxGc-5tRg0QW4ZQg5qd8roNgzJSG_mgs8 --description "更新内容"
+clasp deploy --deploymentId YOUR_DEPLOYMENT_ID --description "更新内容"
 ```
 
 これにより、同じURLが維持されます。
