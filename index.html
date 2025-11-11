@@ -702,15 +702,21 @@
     /**
      * GAS関数呼び出しのラッパー（二重送信防止）
      * 使用例:
-     *   callGasWithLoading(button, function() {
+     *   callGasWithLoading(button, function(enableButton) {
      *     return google.script.run
-     *       .withSuccessHandler(function(result) { ... })
-     *       .withFailureHandler(function(error) { ... })
+     *       .withSuccessHandler(function(result) {
+     *         enableButton(); // 処理完了後に再有効化
+     *         // 成功処理...
+     *       })
+     *       .withFailureHandler(function(error) {
+     *         enableButton(); // エラー時も再有効化
+     *         showError(error);
+     *       })
      *       .someFunction();
      *   });
      * 
      * @param {HTMLElement|string|null} button - ボタン要素、ID、またはnull
-     * @param {Function} gasCallFunction - GAS関数呼び出しを返す関数
+     * @param {Function} gasCallFunction - GAS関数呼び出しを返す関数（enableButton関数を受け取る）
      * @param {Object} options - オプション
      * @param {string} options.loadingText - ローディング中のテキスト
      */
@@ -734,46 +740,15 @@
         setButtonLoading(btn, true, loadingText);
       }
       
-      // GAS関数を呼び出し
-      const gasCall = gasCallFunction();
-      
-      // 成功/失敗ハンドラーをラップして、処理完了後に再有効化
-      if (gasCall && typeof gasCall.withSuccessHandler === 'function') {
-        const originalWithSuccess = gasCall.withSuccessHandler;
-        const originalWithFailure = gasCall.withFailureHandler;
-        
-        // withSuccessHandlerをラップ
-        gasCall.withSuccessHandler = function(successHandler) {
-          return originalWithSuccess.call(gasCall, function(result) {
-            // 処理完了後に再有効化
-            if (btn) {
-              setButtonLoading(btn, false);
-            }
-            if (successHandler) {
-              successHandler(result);
-            }
-          });
-        };
-        
-        // withFailureHandlerをラップ
-        if (originalWithFailure) {
-          gasCall.withFailureHandler = function(failureHandler) {
-            return originalWithFailure.call(gasCall, function(error) {
-              // エラー時も再有効化
-              if (btn) {
-                setButtonLoading(btn, false);
-              }
-              if (failureHandler) {
-                failureHandler(error);
-              } else {
-                showError(error);
-              }
-            });
-          };
+      // 再有効化関数を作成
+      const enableButton = function() {
+        if (btn) {
+          setButtonLoading(btn, false);
         }
-      }
+      };
       
-      return gasCall;
+      // GAS関数を呼び出し（enableButton関数を渡す）
+      return gasCallFunction(enableButton);
     }
     
     // ページ読み込み時にデータを取得
@@ -950,9 +925,10 @@
         status: '未着手'
       };
       
-      callGasWithLoading(submitButton, function() {
+      callGasWithLoading(submitButton, function(enableButton) {
         return google.script.run
           .withSuccessHandler(function(result) {
+            enableButton(); // 処理完了後に再有効化
             if (result.error) {
               alert('エラー: ' + result.message);
             } else {
@@ -961,7 +937,10 @@
               loadData(); // データを再読み込み
             }
           })
-          .withFailureHandler(showError)
+          .withFailureHandler(function(error) {
+            enableButton(); // エラー時も再有効化
+            showError(error);
+          })
           .addTask(formData);
       }, { loadingText: '追加中...' });
     });
@@ -993,9 +972,10 @@
       }
       
       // タスクデータを取得
-      callGasWithLoading(buttonElement, function() {
+      callGasWithLoading(buttonElement, function(enableButton) {
         return google.script.run
           .withSuccessHandler(function(tasks) {
+            enableButton(); // 処理完了後に再有効化
             if (tasks.error) {
               alert('エラー: ' + tasks.message);
               return;
@@ -1017,7 +997,10 @@
             // モーダルを表示
             modal.style.display = 'block';
           })
-          .withFailureHandler(showError)
+          .withFailureHandler(function(error) {
+            enableButton(); // エラー時も再有効化
+            showError(error);
+          })
           .getTasks();
       }, { loadingText: '読み込み中...' });
     }
@@ -1037,9 +1020,10 @@
         priority: document.getElementById('edit-task-priority').value
       };
       
-      callGasWithLoading(submitButton, function() {
+      callGasWithLoading(submitButton, function(enableButton) {
         return google.script.run
           .withSuccessHandler(function(result) {
+            enableButton(); // 処理完了後に再有効化
             if (result.error) {
               alert('エラー: ' + result.message);
             } else {
@@ -1048,7 +1032,10 @@
               loadData(); // データを再読み込み
             }
           })
-          .withFailureHandler(showError)
+          .withFailureHandler(function(error) {
+            enableButton(); // エラー時も再有効化
+            showError(error);
+          })
           .updateTask(taskId, taskData);
       }, { loadingText: '更新中...' });
     });
@@ -1072,9 +1059,10 @@
         return;
       }
       
-      callGasWithLoading(buttonElement, function() {
+      callGasWithLoading(buttonElement, function(enableButton) {
         return google.script.run
           .withSuccessHandler(function(result) {
+            enableButton(); // 処理完了後に再有効化
             if (result.error) {
               alert('エラー: ' + result.message);
             } else {
@@ -1082,7 +1070,10 @@
               loadData(); // データを再読み込み
             }
           })
-          .withFailureHandler(showError)
+          .withFailureHandler(function(error) {
+            enableButton(); // エラー時も再有効化
+            showError(error);
+          })
           .deleteTask(taskId);
       }, { loadingText: '削除中...' });
     }
@@ -1094,9 +1085,10 @@
         selectElement.disabled = true;
       }
       
-      callGasWithLoading(null, function() {
+      callGasWithLoading(null, function(enableButton) {
         return google.script.run
           .withSuccessHandler(function(result) {
+            enableButton(); // 処理完了後に再有効化（ボタンがない場合は何もしない）
             if (result.error) {
               alert('エラー: ' + result.message);
               loadTasks(); // エラー時は再読み込み
@@ -1109,6 +1101,7 @@
             }
           })
           .withFailureHandler(function(error) {
+            enableButton(); // エラー時も再有効化
             showError(error);
             // エラー時もセレクトボックスを再有効化
             if (selectElement) {
@@ -1152,9 +1145,10 @@
         memo: document.getElementById('health-memo').value
       };
       
-      callGasWithLoading(submitButton, function() {
+      callGasWithLoading(submitButton, function(enableButton) {
         return google.script.run
           .withSuccessHandler(function(result) {
+            enableButton(); // 処理完了後に再有効化
             if (result.error) {
               alert('エラー: ' + result.message);
             } else {
@@ -1165,7 +1159,10 @@
               });
             }
           })
-          .withFailureHandler(showError)
+          .withFailureHandler(function(error) {
+            enableButton(); // エラー時も再有効化
+            showError(error);
+          })
           .recordHealthScore(healthData);
       }, { loadingText: '記録中...' });
     });
