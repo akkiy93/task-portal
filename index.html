@@ -617,6 +617,11 @@
       color: #7b1fa2;
     }
     
+    .badge-deadline {
+      background: #fff3e0;
+      color: #e65100;
+    }
+    
     .loading {
       text-align: center;
       padding: 20px;
@@ -988,6 +993,11 @@
             <input type="text" id="task-deliverable" name="deliverable" placeholder="例: プロジェクトマネージャー、クライアントなど">
           </div>
           
+          <div class="form-group">
+            <label for="task-deadline">締切日（任意）</label>
+            <input type="date" id="task-deadline" name="deadline">
+          </div>
+          
           <button type="submit" class="btn btn-primary">タスクを追加</button>
         </form>
       </div>
@@ -1002,6 +1012,7 @@
                 <option value="priority">優先度</option>
                 <option value="importance">重要度</option>
                 <option value="estimatedHours">見積もり時間</option>
+                <option value="deadline">締切日</option>
                 <option value="createdAt">作成日時</option>
                 <option value="updatedAt">更新日時</option>
                 <option value="title">タイトル</option>
@@ -1115,6 +1126,10 @@
         <div class="form-group">
           <label for="edit-task-deliverable">提出先（任意）</label>
           <input type="text" id="edit-task-deliverable" placeholder="例: プロジェクトマネージャー、クライアントなど">
+        </div>
+        <div class="form-group">
+          <label for="edit-task-deadline">締切日（任意）</label>
+          <input type="date" id="edit-task-deadline">
         </div>
         <div style="display: flex; gap: 10px;">
           <button type="submit" class="btn btn-primary" style="flex: 1;">更新</button>
@@ -1440,6 +1455,14 @@
             aVal = parseFloat(a.estimatedHours) || 0;
             bVal = parseFloat(b.estimatedHours) || 0;
             break;
+          case 'deadline':
+            // 締切日がない場合は最後に表示（大きな値）
+            if (!a.deadline && !b.deadline) return 0;
+            if (!a.deadline) return 1;
+            if (!b.deadline) return -1;
+            aVal = new Date(a.deadline).getTime();
+            bVal = new Date(b.deadline).getTime();
+            break;
           case 'createdAt':
             aVal = a.createdAt ? new Date(a.createdAt).getTime() : 0;
             bVal = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -1535,7 +1558,10 @@
               </div>
             </div>
             ${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}
-            ${task.deliverable ? `<div class="task-deliverable" style="margin-top: 8px; font-size: 0.85rem; color: #666;"><span class="badge badge-deliverable">提出先: ${escapeHtml(task.deliverable)}</span></div>` : ''}
+            <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+              ${task.deliverable ? `<span class="badge badge-deliverable">提出先: ${escapeHtml(task.deliverable)}</span>` : ''}
+              ${task.deadline ? `<span class="badge badge-deadline">締切: ${formatDate(task.deadline)}</span>` : ''}
+            </div>
             <div class="task-actions">
               <button class="btn-edit" onclick="editTask(${task.id}, this)">編集</button>
               <button class="btn-delete" onclick="deleteTask(${task.id}, this)">削除</button>
@@ -1653,6 +1679,7 @@
         priority: document.getElementById('task-priority').value,
         importance: document.getElementById('task-importance').value,
         deliverable: document.getElementById('task-deliverable').value,
+        deadline: document.getElementById('task-deadline').value,
         status: '未着手'
       };
       
@@ -1687,6 +1714,25 @@
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+    
+    // 日付をフォーマット（YYYY-MM-DD形式を日本語形式に変換）
+    function formatDate(dateString) {
+      if (!dateString) return '';
+      try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) {
+          // ISO形式でない場合はそのまま返す
+          return dateString;
+        }
+        return date.toLocaleDateString('ja-JP', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      } catch (e) {
+        return dateString;
+      }
     }
     
     // タスクの編集
@@ -1726,6 +1772,17 @@
             document.getElementById('edit-task-priority').value = task.priority;
             document.getElementById('edit-task-importance').value = task.importance || '中';
             document.getElementById('edit-task-deliverable').value = task.deliverable || '';
+            // 締切日を設定（ISO形式に変換）
+            if (task.deadline) {
+              const deadlineDate = new Date(task.deadline);
+              if (!isNaN(deadlineDate.getTime())) {
+                document.getElementById('edit-task-deadline').value = deadlineDate.toISOString().split('T')[0];
+              } else {
+                document.getElementById('edit-task-deadline').value = task.deadline;
+              }
+            } else {
+              document.getElementById('edit-task-deadline').value = '';
+            }
             
             // モーダルを表示
             modal.style.display = 'block';
@@ -1754,7 +1811,8 @@
         estimatedHours: document.getElementById('edit-task-hours').value,
         priority: document.getElementById('edit-task-priority').value,
         importance: document.getElementById('edit-task-importance').value,
-        deliverable: document.getElementById('edit-task-deliverable').value
+        deliverable: document.getElementById('edit-task-deliverable').value,
+        deadline: document.getElementById('edit-task-deadline').value
       };
       
       callGasWithLoading(submitButton, function(enableButton) {
