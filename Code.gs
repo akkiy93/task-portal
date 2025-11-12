@@ -121,75 +121,16 @@ function initializeSpreadsheet() {
     headerRange.setFontWeight('bold');
     tasksSheet.setFrozenRows(1);
   } else {
-    // 既存シートの列構造を更新
+    // 既存シートのヘッダーを確認・更新
     const lastColumn = tasksSheet.getLastColumn();
     const headers = tasksSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
-    const lastRow = tasksSheet.getLastRow();
-    let needsDataShift = false;
     
-    // 必要な列を順番に追加
-    const columnsToAdd = [
-      { index: 6, name: '重要度', insertAfter: 5 },
-      { index: 7, name: '提出先', insertAfter: 6 },
-      { index: 8, name: '締切日', insertAfter: 7 }
-    ];
-    
-    for (const col of columnsToAdd) {
-      if (lastColumn < col.index || headers[col.index - 1] !== col.name) {
-        if (lastColumn < col.index) {
-          tasksSheet.insertColumnAfter(col.insertAfter);
-          needsDataShift = true;
-        }
-        tasksSheet.getRange(1, col.index).setValue(col.name);
-      }
-    }
-    
-    // データシフトが必要な場合（旧形式から新形式への移行）
-    if (needsDataShift && lastRow > 1) {
-      const dataRange = tasksSheet.getRange(2, 1, lastRow - 1, lastColumn);
-      const allData = dataRange.getValues();
-      
-      // 列マッピング: [旧列インデックス] => 新列インデックス
-      const columnMapping = [];
-      for (let i = 0; i < expectedTaskHeaders.length; i++) {
-        columnMapping[i] = i + 1; // デフォルトは同じ位置
-      }
-      
-      // 旧形式（8列）から新形式（11列）へのマッピング
-      if (lastColumn < 8) {
-        // 旧: ID(1), タイトル(2), 説明(3), 時間(4), 優先度(5), ステータス(6), 作成日時(7), 更新日時(8)
-        // 新: ID(1), タイトル(2), 説明(3), 時間(4), 優先度(5), 重要度(6), 提出先(7), 締切日(8), ステータス(9), 作成日時(10), 更新日時(11)
-        const oldToNew = { 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 8, 6: 9, 7: 10 }; // ステータス以降をシフト
-        for (let oldIdx = 0; oldIdx < allData[0].length; oldIdx++) {
-          if (oldToNew[oldIdx] !== undefined) {
-            columnMapping[oldIdx] = oldToNew[oldIdx] + 1;
-          }
-        }
-      } else if (lastColumn === 10) {
-        // 10列形式（重要度・提出先あり、締切日なし）から11列形式への移行
-        const oldToNew = { 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 8, 8: 9, 9: 10 }; // ステータス以降をシフト
-        for (let oldIdx = 0; oldIdx < allData[0].length; oldIdx++) {
-          if (oldToNew[oldIdx] !== undefined) {
-            columnMapping[oldIdx] = oldToNew[oldIdx] + 1;
-          }
-        }
-      }
-      
-      // データを新しい位置にコピー
-      const newData = [];
-      for (let rowIdx = 0; rowIdx < allData.length; rowIdx++) {
-        const newRow = new Array(expectedTaskHeaders.length).fill('');
-        for (let oldColIdx = 0; oldColIdx < allData[rowIdx].length; oldColIdx++) {
-          const newColIdx = columnMapping[oldColIdx] - 1;
-          if (newColIdx >= 0 && newColIdx < expectedTaskHeaders.length) {
-            newRow[newColIdx] = allData[rowIdx][oldColIdx];
-          }
-        }
-        newData.push(newRow);
-      }
-      
-      // 一括でデータを更新
-      tasksSheet.getRange(2, 1, newData.length, expectedTaskHeaders.length).setValues(newData);
+    // ヘッダーが一致しない場合は更新
+    if (lastColumn !== expectedTaskHeaders.length || 
+        !expectedTaskHeaders.every((header, idx) => headers[idx] === header)) {
+      const headerRange = tasksSheet.getRange(1, 1, 1, expectedTaskHeaders.length);
+      headerRange.setValues([expectedTaskHeaders]);
+      headerRange.setFontWeight('bold');
     }
   }
   
@@ -208,65 +149,16 @@ function initializeSpreadsheet() {
     headerRange.setFontWeight('bold');
     reportSheet.setFrozenRows(1);
   } else {
-    // 既存シートの列構造を更新
+    // 既存シートのヘッダーを確認・更新
     const lastColumn = reportSheet.getLastColumn();
     const headers = reportSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
-    const lastRow = reportSheet.getLastRow();
     
-    // 古い形式（8列で「体調スコア」が3列目）の場合は列を更新
-    if (lastColumn === 8 && headers[2] === '体調スコア') {
-      reportSheet.insertColumnAfter(3);
-      
-      // ヘッダーを一括更新
-      const headerUpdates = [
-        { row: 1, col: 3, value: '出社時体調' },
-        { row: 1, col: 4, value: '退社時体調' }
-      ];
-      for (const update of headerUpdates) {
-        reportSheet.getRange(update.row, update.col).setValue(update.value);
-      }
-      
-      // データの移行（バッチ処理）
-      if (lastRow > 1) {
-        const dataRange = reportSheet.getRange(2, 1, lastRow - 1, lastColumn);
-        const allData = dataRange.getValues();
-        
-        // 列マッピング: 旧形式から新形式へ
-        // 旧: 日付(1), 目標(2), 体調スコア(3), 完了タスク数(4), 完了タスク時間(5), 振り返り(6), 明日の予定(7), 記録日時(8)
-        // 新: 日付(1), 目標(2), 出社時体調(3), 退社時体調(4), 完了タスク数(5), 完了タスク時間(6), 振り返り(7), 明日の予定(8), 記録日時(9)
-        const newData = [];
-        for (let rowIdx = 0; rowIdx < allData.length; rowIdx++) {
-          const newRow = [
-            allData[rowIdx][0], // 日付
-            allData[rowIdx][1], // 目標
-            allData[rowIdx][2], // 出社時体調（旧体調スコア）
-            '', // 退社時体調（空）
-            allData[rowIdx][3], // 完了タスク数
-            allData[rowIdx][4], // 完了タスク時間
-            allData[rowIdx][5], // 振り返り
-            allData[rowIdx][6], // 明日の予定
-            allData[rowIdx][7]  // 記録日時
-          ];
-          newData.push(newRow);
-        }
-        
-        // 一括でデータを更新
-        reportSheet.getRange(2, 1, newData.length, expectedReportHeaders.length).setValues(newData);
-      }
-    } else if (lastColumn < 9 || headers[2] !== '出社時体調' || headers[3] !== '退社時体調') {
-      // その他の古い形式の場合
-      if (lastColumn < 4) {
-        if (lastColumn === 3) {
-          reportSheet.insertColumnAfter(3);
-        }
-      }
-      // ヘッダーを更新
-      if (lastColumn >= 3) {
-        reportSheet.getRange(1, 3).setValue('出社時体調');
-      }
-      if (lastColumn >= 4) {
-        reportSheet.getRange(1, 4).setValue('退社時体調');
-      }
+    // ヘッダーが一致しない場合は更新
+    if (lastColumn !== expectedReportHeaders.length || 
+        !expectedReportHeaders.every((header, idx) => headers[idx] === header)) {
+      const headerRange = reportSheet.getRange(1, 1, 1, expectedReportHeaders.length);
+      headerRange.setValues([expectedReportHeaders]);
+      headerRange.setFontWeight('bold');
     }
   }
   
