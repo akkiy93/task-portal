@@ -5,9 +5,13 @@
 ## 機能
 
 - ✅ タスクの一覧表示
-- ✅ タスクの追加
+- ✅ タスクの追加・編集・削除
+- ✅ タスクのステータス変更
 - ✅ Googleカレンダーからの会議予定取得
 - ✅ 週40時間に対するタスク時間の可視化（余力表示）
+- ✅ 日報機能（目標、体調、振り返り）
+- ✅ タスクの重要度・提出先管理
+- ✅ タスク一覧のソート・フィルタ機能
 
 ## セットアップ手順
 
@@ -25,11 +29,8 @@
 #### `Code.gs`
 プロジェクトルートの `Code.gs` の内容をコピー＆ペースト
 
-**重要**: `Code.gs` の `SPREADSHEET_ID` を実際のスプレッドシートIDに置き換えてください。
-
-```javascript
-const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
-```
+**重要**: `Code.gs` の `SPREADSHEET_ID` をスクリプトプロパティに設定してください。
+詳細は [docs/SETUP_SCRIPT_PROPERTIES.md](./docs/SETUP_SCRIPT_PROPERTIES.md) を参照してください。
 
 #### `index.html`
 1. 「ファイル」→「+」→「HTML」を選択
@@ -49,15 +50,24 @@ const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
 3. スプレッドシートのメニューから「拡張機能」→「Apps Script」を選択
 4. これで、そのスプレッドシートに紐付けられたGASプロジェクトが開きます
 5. 上記で作成した `Code.gs` と `index.html` の内容をコピー＆ペースト
-6. `Code.gs` の `SPREADSHEET_ID` をスプレッドシートのIDに設定
+6. スクリプトプロパティに `SPREADSHEET_ID` を設定
 
 **方法2: 既存のGASプロジェクトからスプレッドシートを指定**
 
 1. [Google スプレッドシート](https://sheets.google.com/) で新しいスプレッドシートを作成
 2. スプレッドシートのURLからIDを取得（`https://docs.google.com/spreadsheets/d/[SPREADSHEET_ID]/edit` の `[SPREADSHEET_ID]` 部分）
-3. GASエディタで `Code.gs` を開き、`SPREADSHEET_ID` を設定
+3. GASエディタでスクリプトプロパティに `SPREADSHEET_ID` を設定
 
-### 4. 初期化の実行
+### 4. スクリプトプロパティの設定
+
+1. GASエディタで「プロジェクトの設定」→「スクリプト プロパティ」を開く
+2. 以下のプロパティを追加：
+   - **キー**: `SPREADSHEET_ID`
+   - **値**: スプレッドシートのID
+
+詳細は [docs/SETUP_SCRIPT_PROPERTIES.md](./docs/SETUP_SCRIPT_PROPERTIES.md) を参照してください。
+
+### 5. 初期化の実行
 
 1. GASエディタで「実行」→「initializeSpreadsheet」を選択
 2. 初回実行時は承認が必要です：
@@ -66,7 +76,7 @@ const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
    - 「詳細」→「タスク管理ポータル（安全ではないページ）に移動」をクリック
    - 「許可」をクリック
 
-### 5. Webアプリとして公開
+### 6. Webアプリとして公開
 
 1. GASエディタで「デプロイ」→「新しいデプロイ」をクリック
 2. 種類の選択で「ウェブアプリ」を選択
@@ -77,7 +87,7 @@ const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
 4. 「デプロイ」をクリック
 5. 表示されたURLをコピーしてブラウザで開く
 
-## Claspを使用したデプロイ（オプション）
+## Claspを使用したデプロイ（推奨）
 
 ### Claspのセットアップ
 
@@ -107,6 +117,28 @@ clasp deploy --deploymentId YOUR_DEPLOYMENT_ID --description "更新内容"
 
 詳細は [docs/WEBAPP_DEPLOY.md](./docs/WEBAPP_DEPLOY.md) を参照してください。
 
+## GitHub Issuesへのコメント投稿方法
+
+Issueにコメントを投稿する際は、以下の手順に従ってください：
+
+1. **コメントファイルを作成**
+   - ファイル名: `issue{番号}_comment{番号}.md`（例: `issue8_comment1.md`）
+   - エンコーディング: UTF-8
+   - 場所: プロジェクトルート（一時ファイルとして作成）
+
+2. **コメント内容を記述**
+   - Markdown形式で記述
+   - 日本語で正常に表示されるようにUTF-8で保存
+
+3. **GitHub CLIで投稿**
+   ```bash
+   gh issue comment {イシュー番号} --body-file {ファイル名}.md
+   ```
+
+4. **一時ファイルの削除**
+   - 投稿後、一時ファイルは削除してください
+   - `.gitignore`に設定されているため、Gitにはコミットされません
+
 ## 使い方
 
 ### タスクの追加
@@ -116,7 +148,16 @@ clasp deploy --deploymentId YOUR_DEPLOYMENT_ID --description "更新内容"
    - 説明（任意）
    - 見積もり時間（必須、時間単位）
    - 優先度（高/中/低）
+   - 重要度（高/中/低）
+   - 提出先（任意）
+   - 締切日（任意）
 2. 「タスクを追加」ボタンをクリック
+
+### タスクの管理
+
+- **ソート機能**: 優先度、重要度、見積もり時間、締切日、作成日時、更新日時、タイトルで並び替え可能
+- **フィルタ機能**: 完了タスクの表示/非表示を切り替え可能
+- **編集・削除**: 各タスクの「編集」「削除」ボタンから操作可能
 
 ### 労働負荷の確認
 
@@ -126,18 +167,16 @@ clasp deploy --deploymentId YOUR_DEPLOYMENT_ID --description "更新内容"
   - 合計時間（週40時間に対する使用率）
   - 余力（残り時間）
 
+### 日報機能
+
+- **今日の目標**: ヘッダー部分で目標を設定・保存
+- **体調記録**: 出社時と退社時の体調を記録
+- **日報記入**: 振り返りや明日の予定を記録
+
 ### カレンダー連携
 
 - Googleカレンダーのデフォルトカレンダーから今週の会議予定を自動取得
 - 会議時間は労働負荷の計算に含まれます
-
-## 今後の拡張予定
-
-- [ ] 体調スコアの記録（良い/普通/良くない）
-- [ ] タスクの編集・削除機能
-- [ ] タスクのステータス変更（未着手→進行中→完了）
-- [ ] Slack通知機能
-- [ ] 週次レポートの自動送信（上司への共有）
 
 ## トラブルシューティング
 
@@ -155,11 +194,15 @@ task-portal/
 │   ├── README.md        # ドキュメント一覧
 │   ├── SETUP_GUIDE.md   # セットアップ手順
 │   ├── DEPLOYMENT.md    # デプロイ手順
+│   ├── TROUBLESHOOTING.md # トラブルシューティング
 │   └── ...              # その他のドキュメント
 └── issues/              # イシュー関連ファイル
     ├── issue4_ja.md     # Issue #4: UI改善
     ├── issue5_ja.md     # Issue #5: 機能追加
-    └── issue6_ja.md     # Issue #6: バグ修正
+    ├── issue6_ja.md     # Issue #6: バグ修正
+    ├── issue7_ja.md     # Issue #7: 機能追加
+    ├── issue8_ja.md     # Issue #8: UI改善
+    └── issue9_ja.md     # Issue #9: UI改善
 ```
 
 ## ライセンス

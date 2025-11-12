@@ -28,4 +28,5 @@
 - **FIX_ISSUE_TITLES.md** - イシュータイトル修正手順
 - **FIX_ISSUES_WEB.md** - Web UIでのイシュー修正手順
 - **UPDATE_ISSUES_JA.md** - イシューを日本語に更新する手順
+- **COMMENT_GUIDE.md** - GitHub Issuesへのコメント投稿ガイド
 
