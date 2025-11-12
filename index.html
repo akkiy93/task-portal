@@ -445,6 +445,26 @@
       color: #1976d2;
     }
     
+    .badge-importance-high {
+      background: #fce4ec;
+      color: #c2185b;
+    }
+    
+    .badge-importance-medium {
+      background: #fff9c4;
+      color: #f57f17;
+    }
+    
+    .badge-importance-low {
+      background: #e0f2f1;
+      color: #00695c;
+    }
+    
+    .badge-deliverable {
+      background: #f3e5f5;
+      color: #7b1fa2;
+    }
+    
     .loading {
       text-align: center;
       padding: 20px;
@@ -798,6 +818,22 @@
               <option value="中" selected>中</option>
               <option value="低">低</option>
             </select>
+            <small style="color: #666; font-size: 0.85rem;">※ 緊急度（いつまでにやるか）</small>
+          </div>
+          
+          <div class="form-group">
+            <label for="task-importance">重要度</label>
+            <select id="task-importance" name="importance">
+              <option value="高">高</option>
+              <option value="中" selected>中</option>
+              <option value="低">低</option>
+            </select>
+            <small style="color: #666; font-size: 0.85rem;">※ 重要さ（どれだけ重要か）</small>
+          </div>
+          
+          <div class="form-group">
+            <label for="task-deliverable">提出先（任意）</label>
+            <input type="text" id="task-deliverable" name="deliverable" placeholder="例: プロジェクトマネージャー、クライアントなど">
           </div>
           
           <button type="submit" class="btn btn-primary">タスクを追加</button>
@@ -887,6 +923,20 @@
             <option value="中">中</option>
             <option value="低">低</option>
           </select>
+          <small style="color: #666; font-size: 0.85rem;">※ 緊急度（いつまでにやるか）</small>
+        </div>
+        <div class="form-group">
+          <label for="edit-task-importance">重要度</label>
+          <select id="edit-task-importance">
+            <option value="高">高</option>
+            <option value="中">中</option>
+            <option value="低">低</option>
+          </select>
+          <small style="color: #666; font-size: 0.85rem;">※ 重要さ（どれだけ重要か）</small>
+        </div>
+        <div class="form-group">
+          <label for="edit-task-deliverable">提出先（任意）</label>
+          <input type="text" id="edit-task-deliverable" placeholder="例: プロジェクトマネージャー、クライアントなど">
         </div>
         <div style="display: flex; gap: 10px;">
           <button type="submit" class="btn btn-primary" style="flex: 1;">更新</button>
@@ -1176,6 +1226,7 @@
       tasks.forEach(task => {
         const priorityClass = `priority-${task.priority === '高' ? 'high' : task.priority === '中' ? 'medium' : 'low'}`;
         const badgeClass = `badge-priority-${task.priority === '高' ? 'high' : task.priority === '中' ? 'medium' : 'low'}`;
+        const importanceBadgeClass = `badge-importance-${task.importance === '高' ? 'high' : task.importance === '中' ? 'medium' : 'low'}`;
         const statusClass = `badge-status-${task.status === '完了' ? 'completed' : task.status === '進行中' ? 'in-progress' : task.status === 'キャンセル' ? 'cancelled' : 'pending'}`;
         
         html += `
@@ -1189,11 +1240,13 @@
                   <option value="完了" ${task.status === '完了' ? 'selected' : ''}>完了</option>
                   <option value="キャンセル" ${task.status === 'キャンセル' ? 'selected' : ''}>キャンセル</option>
                 </select>
-                <span class="badge ${badgeClass}">${escapeHtml(task.priority)}</span>
+                <span class="badge ${badgeClass}">優先: ${escapeHtml(task.priority)}</span>
+                <span class="badge ${importanceBadgeClass}">重要: ${escapeHtml(task.importance || '中')}</span>
                 <span class="badge badge-hours">${task.estimatedHours}時間</span>
               </div>
             </div>
             ${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}
+            ${task.deliverable ? `<div class="task-deliverable" style="margin-top: 8px; font-size: 0.85rem; color: #666;"><span class="badge badge-deliverable">提出先: ${escapeHtml(task.deliverable)}</span></div>` : ''}
             <div class="task-actions">
               <button class="btn-edit" onclick="editTask(${task.id}, this)">編集</button>
               <button class="btn-delete" onclick="deleteTask(${task.id}, this)">削除</button>
@@ -1309,6 +1362,8 @@
         description: document.getElementById('task-description').value,
         estimatedHours: document.getElementById('task-hours').value,
         priority: document.getElementById('task-priority').value,
+        importance: document.getElementById('task-importance').value,
+        deliverable: document.getElementById('task-deliverable').value,
         status: '未着手'
       };
       
@@ -1380,6 +1435,8 @@
             document.getElementById('edit-task-description').value = task.description || '';
             document.getElementById('edit-task-hours').value = task.estimatedHours;
             document.getElementById('edit-task-priority').value = task.priority;
+            document.getElementById('edit-task-importance').value = task.importance || '中';
+            document.getElementById('edit-task-deliverable').value = task.deliverable || '';
             
             // モーダルを表示
             modal.style.display = 'block';
@@ -1406,7 +1463,9 @@
         title: document.getElementById('edit-task-title').value,
         description: document.getElementById('edit-task-description').value,
         estimatedHours: document.getElementById('edit-task-hours').value,
-        priority: document.getElementById('edit-task-priority').value
+        priority: document.getElementById('edit-task-priority').value,
+        importance: document.getElementById('edit-task-importance').value,
+        deliverable: document.getElementById('edit-task-deliverable').value
       };
       
       callGasWithLoading(submitButton, function(enableButton) {

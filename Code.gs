@@ -110,12 +110,57 @@ function initializeSpreadsheet() {
   let tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
   if (!tasksSheet) {
     tasksSheet = ss.insertSheet(SHEET_NAME_TASKS);
-    // ヘッダー行を設定
-    tasksSheet.getRange(1, 1, 1, 8).setValues([[
-      'ID', 'タイトル', '説明', '見積もり時間（時間）', '優先度', 'ステータス', '作成日時', '更新日時'
+    // ヘッダー行を設定（重要度と提出先を追加）
+    tasksSheet.getRange(1, 1, 1, 10).setValues([[
+      'ID', 'タイトル', '説明', '見積もり時間（時間）', '優先度', '重要度', '提出先', 'ステータス', '作成日時', '更新日時'
     ]]);
-    tasksSheet.getRange(1, 1, 1, 8).setFontWeight('bold');
+    tasksSheet.getRange(1, 1, 1, 10).setFontWeight('bold');
     tasksSheet.setFrozenRows(1);
+  } else {
+    // 既存のシートがある場合、列数を確認して必要に応じて更新
+    const lastColumn = tasksSheet.getLastColumn();
+    const headers = tasksSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+    
+    // 重要度列（6列目）が存在しない場合は追加
+    if (lastColumn < 6 || headers[5] !== '重要度') {
+      if (lastColumn < 6) {
+        // 列が足りない場合は列を追加
+        tasksSheet.insertColumnAfter(5);
+        tasksSheet.getRange(1, 6).setValue('重要度');
+      } else {
+        tasksSheet.getRange(1, 6).setValue('重要度');
+      }
+    }
+    
+    // 提出先列（7列目）が存在しない場合は追加
+    if (lastColumn < 7 || headers[6] !== '提出先') {
+      if (lastColumn < 7) {
+        tasksSheet.insertColumnAfter(6);
+        tasksSheet.getRange(1, 7).setValue('提出先');
+      } else {
+        tasksSheet.getRange(1, 7).setValue('提出先');
+      }
+      
+      // 既存データの列をシフト（ステータス以降を右に移動）
+      const lastRow = tasksSheet.getLastRow();
+      if (lastRow > 1) {
+        // ステータス（7→8列目）
+        if (lastColumn >= 6) {
+          const statusData = tasksSheet.getRange(2, 6, lastRow - 1, 1).getValues();
+          tasksSheet.getRange(2, 8, lastRow - 1, 1).setValues(statusData);
+        }
+        // 作成日時（7→9列目）
+        if (lastColumn >= 7) {
+          const createdAtData = tasksSheet.getRange(2, 7, lastRow - 1, 1).getValues();
+          tasksSheet.getRange(2, 9, lastRow - 1, 1).setValues(createdAtData);
+        }
+        // 更新日時（8→10列目）
+        if (lastColumn >= 8) {
+          const updatedAtData = tasksSheet.getRange(2, 8, lastRow - 1, 1).getValues();
+          tasksSheet.getRange(2, 10, lastRow - 1, 1).setValues(updatedAtData);
+        }
+      }
+    }
   }
   
   // 日報シートの作成
@@ -271,9 +316,11 @@ function getTasks() {
           description: row[2] || '',
           estimatedHours: row[3] || 0,
           priority: row[4] || '中',
-          status: row[5] || '未着手',
-          createdAt: row[6] || '',
-          updatedAt: row[7] || ''
+          importance: row[5] || '中', // 重要度（既存データは空の可能性がある）
+          deliverable: row[6] || '', // 提出先（既存データは空の可能性がある）
+          status: row[7] || row[5] || '未着手', // 後方互換性のため
+          createdAt: row[8] || row[6] || '', // 後方互換性のため
+          updatedAt: row[9] || row[7] || '' // 後方互換性のため
         });
       }
     }
@@ -344,6 +391,8 @@ function addTask(taskData) {
       taskData.description || '',
       parseFloat(taskData.estimatedHours) || 0,
       taskData.priority || '中',
+      taskData.importance || '中', // 重要度
+      taskData.deliverable || '', // 提出先
       taskData.status || '未着手',
       now.toISOString(),
       now.toISOString()
@@ -429,19 +478,23 @@ function updateTask(taskId, taskData) {
     const now = new Date();
     
     // 更新するデータを準備（指定されていない場合は既存の値を使用）
+    // 後方互換性のため、列数に応じて処理
+    const lastColumn = tasksSheet.getLastColumn();
     const updatedRow = [
       existingRow[0], // IDは変更しない
       taskData.title !== undefined ? taskData.title : existingRow[1],
       taskData.description !== undefined ? taskData.description : existingRow[2],
       taskData.estimatedHours !== undefined ? parseFloat(taskData.estimatedHours) : existingRow[3],
       taskData.priority !== undefined ? taskData.priority : existingRow[4],
-      taskData.status !== undefined ? taskData.status : existingRow[5],
-      existingRow[6], // 作成日時は変更しない
+      taskData.importance !== undefined ? taskData.importance : (existingRow[5] || '中'), // 重要度
+      taskData.deliverable !== undefined ? taskData.deliverable : (existingRow[6] || ''), // 提出先
+      taskData.status !== undefined ? taskData.status : (existingRow[7] || existingRow[5] || '未着手'), // ステータス（後方互換性）
+      existingRow[8] || existingRow[6] || '', // 作成日時は変更しない（後方互換性）
       now.toISOString() // 更新日時を更新
     ];
     
-    // 行を更新
-    tasksSheet.getRange(rowIndex, 1, 1, 8).setValues([updatedRow]);
+    // 行を更新（10列で更新）
+    tasksSheet.getRange(rowIndex, 1, 1, 10).setValues([updatedRow]);
     
     return {
       success: true,
