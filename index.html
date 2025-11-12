@@ -282,6 +282,27 @@
       .main-content {
         grid-template-columns: 1fr;
       }
+      
+      .task-controls-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      .sort-controls,
+      .filter-controls {
+        width: 100%;
+        justify-content: space-between;
+      }
+      
+      .task-meta {
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+      
+      .task-header {
+        flex-direction: column;
+        gap: 10px;
+      }
     }
     
     .card {
@@ -361,34 +382,165 @@
       transform: translateY(0);
     }
     
+    .task-list-controls {
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    
+    .task-controls-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .sort-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .sort-controls label {
+      font-weight: 600;
+      color: #555;
+      font-size: 0.9rem;
+    }
+    
+    .task-sort-select {
+      padding: 8px 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      background: white;
+      cursor: pointer;
+      transition: border-color 0.3s;
+    }
+    
+    .task-sort-select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .btn-sort-order {
+      padding: 8px 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.3s;
+      min-width: 40px;
+    }
+    
+    .btn-sort-order:hover {
+      border-color: #667eea;
+      background: #f8f9fa;
+    }
+    
+    .filter-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: 0.3s;
+      border-radius: 24px;
+    }
+    
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+    
+    .toggle-switch input:checked + .toggle-slider {
+      background-color: #667eea;
+    }
+    
+    .toggle-switch input:checked + .toggle-slider:before {
+      transform: translateX(26px);
+    }
+    
+    .toggle-label {
+      font-weight: 600;
+      color: #555;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    
+    .task-count-info {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      color: #666;
+    }
+    
     .task-list {
       max-height: 600px;
       overflow-y: auto;
     }
     
     .task-item {
-      background: #f8f9fa;
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 10px;
-      border-left: 4px solid #667eea;
-      transition: transform 0.2s;
+      background: white;
+      padding: 18px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      border-left: 5px solid #667eea;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
     }
     
     .task-item:hover {
-      transform: translateX(5px);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    }
+    
+    .task-item.completed {
+      opacity: 0.6;
+      background: #f5f5f5;
     }
     
     .task-item.priority-high {
       border-left-color: #e74c3c;
+      background: linear-gradient(to right, #fff5f5 0%, white 5%);
     }
     
     .task-item.priority-medium {
       border-left-color: #f39c12;
+      background: linear-gradient(to right, #fffbf0 0%, white 5%);
     }
     
     .task-item.priority-low {
       border-left-color: #27ae60;
+      background: linear-gradient(to right, #f0fff4 0%, white 5%);
     }
     
     .task-header {
@@ -842,6 +994,32 @@
       
       <div class="card">
         <h2>📝 タスク一覧</h2>
+        <div class="task-list-controls">
+          <div class="task-controls-row">
+            <div class="sort-controls">
+              <label for="task-sort">並び替え:</label>
+              <select id="task-sort" class="task-sort-select">
+                <option value="priority">優先度</option>
+                <option value="importance">重要度</option>
+                <option value="estimatedHours">見積もり時間</option>
+                <option value="createdAt">作成日時</option>
+                <option value="updatedAt">更新日時</option>
+                <option value="title">タイトル</option>
+              </select>
+              <button id="sort-order-btn" class="btn-sort-order" onclick="toggleSortOrder()" title="昇順/降順を切り替え">
+                <span id="sort-order-icon">↑</span>
+              </button>
+            </div>
+            <div class="filter-controls">
+              <label class="toggle-switch">
+                <input type="checkbox" id="show-completed-toggle" onchange="toggleCompletedTasks()">
+                <span class="toggle-slider"></span>
+              </label>
+              <label for="show-completed-toggle" class="toggle-label">完了タスクを表示</label>
+            </div>
+          </div>
+          <div id="task-count-info" class="task-count-info"></div>
+        </div>
         <div id="task-list" class="task-list">
           <div class="loading">読み込み中...</div>
         </div>
@@ -1057,6 +1235,15 @@
         loadDailyReport(today);
         loadCompletedTasksToday(today);
       }
+      
+      // ソート選択の変更イベント
+      const sortSelect = document.getElementById('task-sort');
+      if (sortSelect) {
+        sortSelect.addEventListener('change', function() {
+          currentSortBy = this.value;
+          applyFiltersAndSort();
+        });
+      }
     };
     
     // リアルタイム時計の更新
@@ -1200,12 +1387,113 @@
       loadCalendarEvents();
     }
     
+    // タスク一覧の状態管理
+    let allTasks = [];
+    let currentSortBy = 'priority';
+    let currentSortOrder = 'desc'; // 'asc' or 'desc'
+    let showCompleted = false; // デフォルトで完了タスクを非表示
+    
     // タスク一覧を読み込む
     function loadTasks() {
       google.script.run
-        .withSuccessHandler(displayTasks)
+        .withSuccessHandler(function(tasks) {
+          allTasks = tasks;
+          applyFiltersAndSort();
+        })
         .withFailureHandler(showError)
         .getTasks();
+    }
+    
+    // フィルタリングとソートを適用
+    function applyFiltersAndSort() {
+      let filteredTasks = filterCompletedTasks(allTasks, showCompleted);
+      let sortedTasks = sortTasks(filteredTasks, currentSortBy, currentSortOrder);
+      displayTasks(sortedTasks);
+      updateTaskCountInfo(allTasks, filteredTasks);
+    }
+    
+    // 完了タスクのフィルタリング
+    function filterCompletedTasks(tasks, showCompleted) {
+      if (showCompleted) {
+        return tasks;
+      }
+      return tasks.filter(task => task.status !== '完了');
+    }
+    
+    // タスクのソート
+    function sortTasks(tasks, sortBy, sortOrder) {
+      const sorted = [...tasks].sort((a, b) => {
+        let aVal, bVal;
+        
+        switch(sortBy) {
+          case 'priority':
+            const priorityOrder = { '高': 3, '中': 2, '低': 1 };
+            aVal = priorityOrder[a.priority] || 0;
+            bVal = priorityOrder[b.priority] || 0;
+            break;
+          case 'importance':
+            const importanceOrder = { '高': 3, '中': 2, '低': 1 };
+            aVal = importanceOrder[a.importance] || 0;
+            bVal = importanceOrder[b.importance] || 0;
+            break;
+          case 'estimatedHours':
+            aVal = parseFloat(a.estimatedHours) || 0;
+            bVal = parseFloat(b.estimatedHours) || 0;
+            break;
+          case 'createdAt':
+            aVal = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            bVal = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            break;
+          case 'updatedAt':
+            aVal = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+            bVal = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+            break;
+          case 'title':
+            aVal = (a.title || '').toLowerCase();
+            bVal = (b.title || '').toLowerCase();
+            break;
+          default:
+            return 0;
+        }
+        
+        if (sortBy === 'title') {
+          return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        } else {
+          return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+      });
+      
+      return sorted;
+    }
+    
+    // ソート順を切り替え
+    function toggleSortOrder() {
+      currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+      const icon = document.getElementById('sort-order-icon');
+      icon.textContent = currentSortOrder === 'asc' ? '↑' : '↓';
+      applyFiltersAndSort();
+    }
+    
+    // 完了タスクの表示/非表示を切り替え
+    function toggleCompletedTasks() {
+      const toggle = document.getElementById('show-completed-toggle');
+      showCompleted = toggle.checked;
+      applyFiltersAndSort();
+    }
+    
+    // タスク件数情報を更新
+    function updateTaskCountInfo(allTasks, filteredTasks) {
+      const countInfo = document.getElementById('task-count-info');
+      const totalCount = allTasks.length;
+      const completedCount = allTasks.filter(t => t.status === '完了').length;
+      const activeCount = totalCount - completedCount;
+      const displayedCount = filteredTasks.length;
+      
+      if (showCompleted) {
+        countInfo.textContent = `全${totalCount}件中${displayedCount}件を表示（完了: ${completedCount}件、未完了: ${activeCount}件）`;
+      } else {
+        countInfo.textContent = `全${totalCount}件中${displayedCount}件を表示（完了${completedCount}件は非表示）`;
+      }
     }
     
     // タスク一覧を表示
@@ -1228,9 +1516,10 @@
         const badgeClass = `badge-priority-${task.priority === '高' ? 'high' : task.priority === '中' ? 'medium' : 'low'}`;
         const importanceBadgeClass = `badge-importance-${task.importance === '高' ? 'high' : task.importance === '中' ? 'medium' : 'low'}`;
         const statusClass = `badge-status-${task.status === '完了' ? 'completed' : task.status === '進行中' ? 'in-progress' : task.status === 'キャンセル' ? 'cancelled' : 'pending'}`;
+        const isCompleted = task.status === '完了';
         
         html += `
-          <div class="task-item ${priorityClass}" data-task-id="${task.id}">
+          <div class="task-item ${priorityClass} ${isCompleted ? 'completed' : ''}" data-task-id="${task.id}">
             <div class="task-header">
               <div class="task-title">${escapeHtml(task.title)}</div>
               <div class="task-meta">
