@@ -1,6 +1,9 @@
 /**
  * タスク管理ポータル - Google Apps Script
  * 
+ * バージョン: v67
+ * 変更内容: コード全体のリファクタリング（共通処理の抽出、エラーハンドリングの統一、日付処理の共通化、日報操作の共通化）
+ * 
  * 機能:
  * - タスクの一覧表示
  * - タスクの追加・編集・削除
@@ -9,6 +12,10 @@
  * - 週40時間に対するタスク時間の可視化
  * - 体調スコアの記録と可視化
  */
+
+// ============================================================================
+// 定数定義
+// ============================================================================
 
 // スプレッドシートの設定
 const SHEET_NAME_TASKS = 'タスク';
@@ -41,15 +48,18 @@ const REPORT_COL_TOMORROW_PLAN = 7;
 const REPORT_COL_RECORDED_AT = 8;
 const REPORT_COLUMN_COUNT = 9;
 
+// ============================================================================
+// ユーティリティ関数
+// ============================================================================
+
 /**
  * スプレッドシートIDを取得
- * スクリプトプロパティから取得し、設定されていない場合はデフォルト値を使用
+ * スクリプトプロパティから取得し、設定されていない場合はエラーを返す
  */
 function getSpreadsheetId() {
   const scriptProperties = PropertiesService.getScriptProperties();
-  let spreadsheetId = scriptProperties.getProperty('SPREADSHEET_ID');
+  const spreadsheetId = scriptProperties.getProperty('SPREADSHEET_ID');
   
-  // スクリプトプロパティに設定されていない場合は、エラーを返す
   if (!spreadsheetId) {
     Logger.log('Error: SPREADSHEET_ID is not set in script properties.');
     throw new Error('スプレッドシートIDがスクリプトプロパティに設定されていません。GASエディタの「プロジェクトの設定」→「スクリプト プロパティ」で設定してください。');
@@ -70,12 +80,9 @@ function getSpreadsheet() {
     let ss = null;
     try {
       const activeSs = SpreadsheetApp.getActiveSpreadsheet();
-      if (activeSs) {
-        const activeId = activeSs.getId();
-        if (activeId === SPREADSHEET_ID) {
-          ss = activeSs;
-          Logger.log('Using active spreadsheet');
-        }
+      if (activeSs && activeSs.getId() === SPREADSHEET_ID) {
+        ss = activeSs;
+        Logger.log('Using active spreadsheet');
       }
     } catch (e) {
       // アクティブなスプレッドシートがない（Webアプリ実行時など）
@@ -108,6 +115,146 @@ function getSpreadsheet() {
     throw new Error(errorMsg);
   }
 }
+
+/**
+ * シートを安全に取得（存在しない場合は初期化）
+ * @param {Spreadsheet} ss - スプレッドシートオブジェクト
+ * @param {string} sheetName - シート名
+ * @param {boolean} autoInit - 存在しない場合に自動初期化するか
+ * @return {Sheet} シートオブジェクト
+ */
+function getSheetSafely(ss, sheetName, autoInit = true) {
+  let sheet = ss.getSheetByName(sheetName);
+  
+  if (!sheet && autoInit) {
+    initializeSpreadsheet();
+    sheet = ss.getSheetByName(sheetName);
+  }
+  
+  return sheet;
+}
+
+/**
+ * 日付をYYYY-MM-DD形式の文字列に変換
+ * @param {Date|string} date - 日付（Dateオブジェクトまたは文字列）
+ * @return {string} YYYY-MM-DD形式の日付文字列
+ */
+function formatDateToString(date) {
+  if (date instanceof Date) {
+    return Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  } else if (typeof date === 'string') {
+    // 文字列の場合は、日付部分のみ取得（時刻が含まれている場合がある）
+    return date.split(' ')[0].split('T')[0];
+  }
+  return '';
+}
+
+/**
+ * 日付が一致するかチェック
+ * @param {Date|string} date1 - 比較する日付1
+ * @param {string} date2Str - 比較する日付2（YYYY-MM-DD形式）
+ * @return {boolean} 一致する場合true
+ */
+function isDateMatch(date1, date2Str) {
+  const date1Str = formatDateToString(date1);
+  return date1Str === date2Str;
+}
+
+/**
+ * エラーレスポンスを作成
+ * @param {string} message - エラーメッセージ
+ * @param {Object} additionalData - 追加データ
+ * @return {Object} エラーレスポンスオブジェクト
+ */
+function createErrorResponse(message, additionalData = {}) {
+  return {
+    error: true,
+    message: message,
+    ...additionalData
+  };
+}
+
+/**
+ * 成功レスポンスを作成
+ * @param {string} message - 成功メッセージ
+ * @param {Object} additionalData - 追加データ
+ * @return {Object} 成功レスポンスオブジェクト
+ */
+function createSuccessResponse(message, additionalData = {}) {
+  return {
+    success: true,
+    message: message,
+    ...additionalData
+  };
+}
+
+/**
+ * タスクデータをパース（getTasks()の結果から）
+ * @param {string|Object} tasksResult - getTasks()の結果
+ * @return {Object} パースされたタスクデータ {success, tasks, count, message?}
+ */
+function parseTasksResult(tasksResult) {
+  // JSON文字列の場合はパース
+  if (typeof tasksResult === 'string') {
+    try {
+      return JSON.parse(tasksResult);
+    } catch (parseError) {
+      Logger.log('parseTasksResult: JSONパースエラー - ' + parseError.toString());
+      return {
+        success: false,
+        error: true,
+        message: 'タスクデータの解析に失敗しました',
+        tasks: [],
+        count: 0
+      };
+    }
+  }
+  
+  // 既にオブジェクトの場合はそのまま返す
+  return tasksResult || { success: false, tasks: [], count: 0 };
+}
+
+/**
+ * 日報行を検索
+ * @param {Sheet} reportSheet - 日報シート
+ * @param {string} date - 日付（YYYY-MM-DD形式）
+ * @return {number} 行インデックス（見つからない場合は-1、1始まり）
+ */
+function findReportRow(reportSheet, date) {
+  const data = reportSheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (isDateMatch(data[i][REPORT_COL_DATE], date)) {
+      return i + 1; // スプレッドシートの行番号は1から始まる
+    }
+  }
+  
+  return -1;
+}
+
+/**
+ * 新しい日報行を作成
+ * @param {string} date - 日付
+ * @param {Object} data - 日報データ
+ * @return {Array} 日報行の配列
+ */
+function createReportRow(date, data = {}) {
+  const row = new Array(REPORT_COLUMN_COUNT);
+  row[REPORT_COL_DATE] = date;
+  row[REPORT_COL_GOAL] = data.goal || '';
+  row[REPORT_COL_ARRIVAL_HEALTH] = data.arrivalHealthScore || '';
+  row[REPORT_COL_DEPARTURE_HEALTH] = data.departureHealthScore || '';
+  row[REPORT_COL_COMPLETED_TASK_COUNT] = data.completedTaskCount || 0;
+  row[REPORT_COL_COMPLETED_TASK_HOURS] = data.completedTaskHours || 0;
+  row[REPORT_COL_REFLECTION] = data.reflection || '';
+  row[REPORT_COL_TOMORROW_PLAN] = data.tomorrowPlan || '';
+  row[REPORT_COL_RECORDED_AT] = data.recordedAt || new Date();
+  return row;
+}
+
+// ============================================================================
+// 初期化・デバッグ関数
+// ============================================================================
 
 /**
  * Webアプリとして公開する際のエントリーポイント
@@ -162,91 +309,175 @@ function initializeSpreadsheet() {
     reportSheet.setFrozenRows(1);
   }
   
-  return {
-    success: true,
-    message: 'スプレッドシートが初期化されました'
-  };
+  return createSuccessResponse('スプレッドシートが初期化されました');
 }
+
+/**
+ * デバッグ用: スプレッドシートの状態を確認
+ */
+function debugSpreadsheetStatus() {
+  try {
+    const ss = getSpreadsheet();
+    if (!ss) {
+      return createErrorResponse('スプレッドシートが取得できませんでした（null）', {
+        spreadsheetExists: false
+      });
+    }
+    
+    Logger.log('DEBUG: スプレッドシートID: ' + ss.getId());
+    Logger.log('DEBUG: スプレッドシート名: ' + ss.getName());
+    
+    // タスクシートの確認
+    const tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
+    const tasksSheetInfo = tasksSheet ? {
+      exists: true,
+      lastRow: tasksSheet.getLastRow(),
+      lastColumn: tasksSheet.getLastColumn(),
+      dataRowCount: tasksSheet.getDataRange() ? tasksSheet.getDataRange().getValues().length : 0,
+      headers: tasksSheet.getDataRange() ? tasksSheet.getDataRange().getValues()[0] : null,
+      firstDataRow: tasksSheet.getDataRange() && tasksSheet.getDataRange().getValues().length > 1 
+        ? tasksSheet.getDataRange().getValues()[1] : null
+    } : { exists: false };
+    
+    // 日報シートの確認
+    const reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+    const reportSheetInfo = reportSheet ? {
+      exists: true,
+      lastRow: reportSheet.getLastRow(),
+      lastColumn: reportSheet.getLastColumn(),
+      dataRowCount: reportSheet.getDataRange() ? reportSheet.getDataRange().getValues().length : 0,
+      headers: reportSheet.getDataRange() ? reportSheet.getDataRange().getValues()[0] : null,
+      firstDataRow: reportSheet.getDataRange() && reportSheet.getDataRange().getValues().length > 1 
+        ? reportSheet.getDataRange().getValues()[1] : null
+    } : { exists: false };
+    
+    return {
+      error: false,
+      spreadsheetId: ss.getId(),
+      spreadsheetName: ss.getName(),
+      tasksSheet: tasksSheetInfo,
+      reportSheet: reportSheetInfo
+    };
+  } catch (error) {
+    Logger.log('DEBUG ERROR: ' + error.toString());
+    return createErrorResponse(error.toString(), { stack: error.stack });
+  }
+}
+
+/**
+ * デバッグ用: getTasks()の動作を詳細にログ出力
+ */
+function debugGetTasks() {
+  try {
+    Logger.log('=== DEBUG: getTasks() 開始 ===');
+    
+    const ss = getSpreadsheet();
+    Logger.log('DEBUG: スプレッドシート取得: 成功');
+    
+    const tasksSheet = getSheetSafely(ss, SHEET_NAME_TASKS);
+    if (!tasksSheet) {
+      Logger.log('DEBUG: タスクシートの作成に失敗しました');
+      return createErrorResponse('タスクシートの作成に失敗しました');
+    }
+    
+    const dataRange = tasksSheet.getDataRange();
+    if (!dataRange) {
+      Logger.log('DEBUG: getDataRange()がnullを返しました');
+      return [];
+    }
+    
+    const data = dataRange.getValues();
+    Logger.log('DEBUG: getValues()結果: ' + (data ? '成功' : 'null'));
+    Logger.log('DEBUG: getValues()型: ' + typeof data);
+    Logger.log('DEBUG: getValues()が配列か: ' + Array.isArray(data));
+    Logger.log('DEBUG: データ行数: ' + (data ? data.length : 0));
+    
+    if (!data || !Array.isArray(data) || data.length <= 1) {
+      Logger.log('DEBUG: データがヘッダーのみ（データ行なし）');
+      return [];
+    }
+    
+    Logger.log('DEBUG: ヘッダー行: ' + JSON.stringify(data[0]));
+    
+    const tasks = [];
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row || !Array.isArray(row)) {
+        Logger.log('DEBUG: 行' + i + 'は無効（スキップ）');
+        continue;
+      }
+      
+      const taskId = row[TASK_COL_ID];
+      Logger.log('DEBUG: 行' + i + 'のID: ' + taskId + ' (型: ' + typeof taskId + ')');
+      
+      if (taskId !== null && taskId !== undefined && taskId !== '') {
+        const task = {
+          id: taskId,
+          title: row[TASK_COL_TITLE] || '',
+          description: row[TASK_COL_DESCRIPTION] || '',
+          estimatedHours: row[TASK_COL_ESTIMATED_HOURS] || 0,
+          priority: row[TASK_COL_PRIORITY] || '中',
+          importance: row[TASK_COL_IMPORTANCE] || '中',
+          deliverable: row[TASK_COL_DELIVERABLE] || '',
+          deadline: row[TASK_COL_DEADLINE] || '',
+          status: row[TASK_COL_STATUS] || '未着手',
+          createdAt: row[TASK_COL_CREATED_AT] || '',
+          updatedAt: row[TASK_COL_UPDATED_AT] || ''
+        };
+        Logger.log('DEBUG: タスク作成: ' + JSON.stringify(task));
+        tasks.push(task);
+      }
+    }
+    
+    Logger.log('=== DEBUG: getTasks() 完了 ===');
+    Logger.log('DEBUG: 取得したタスク数: ' + tasks.length);
+    Logger.log('DEBUG: 取得したタスク: ' + JSON.stringify(tasks));
+    
+    return tasks;
+  } catch (error) {
+    Logger.log('=== DEBUG: getTasks() エラー ===');
+    Logger.log('DEBUG ERROR: ' + error.toString());
+    Logger.log('DEBUG ERROR STACK: ' + (error.stack || 'No stack trace'));
+    return [];
+  }
+}
+
+// ============================================================================
+// タスク管理関数
+// ============================================================================
 
 /**
  * タスク一覧を取得
  */
 function getTasks() {
   try {
-    let ss;
-    try {
-      ss = getSpreadsheet();
-    } catch (spreadsheetError) {
-      Logger.log('Failed to get spreadsheet: ' + spreadsheetError.toString());
-      return {
-        error: true,
-        message: 'スプレッドシートを取得できませんでした: ' + spreadsheetError.toString()
-      };
-    }
+    const ss = getSpreadsheet();
+    const tasksSheet = getSheetSafely(ss, SHEET_NAME_TASKS);
     
-    if (!ss) {
-      return {
-        error: true,
-        message: 'スプレッドシートを取得できませんでした（null）'
-      };
-    }
-    
-    let tasksSheet;
-    try {
-      tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
-    } catch (sheetError) {
-      Logger.log('Failed to get sheet by name: ' + sheetError.toString());
-      return {
-        error: true,
-        message: 'タスクシートの取得に失敗しました: ' + sheetError.toString()
-      };
-    }
-    
-    // シートが存在しない場合は初期化
     if (!tasksSheet) {
-      try {
-        initializeSpreadsheet();
-        tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
-        if (!tasksSheet) {
-          return {
-            error: true,
-            message: 'タスクシートの作成に失敗しました'
-          };
-        }
-      } catch (initError) {
-        return {
-          error: true,
-          message: 'スプレッドシートの初期化に失敗しました: ' + initError.toString()
-        };
-      }
+      return JSON.stringify(createErrorResponse('タスクシートの作成に失敗しました', {
+        tasks: [],
+        count: 0
+      }));
     }
     
     const dataRange = tasksSheet.getDataRange();
     if (!dataRange) {
-      Logger.log('getDataRange returned null');
-      return [];
+      return JSON.stringify(createSuccessResponse('', { tasks: [], count: 0 }));
     }
     
     const data = dataRange.getValues();
-    if (!data || !Array.isArray(data)) {
-      Logger.log('getValues returned null or not an array');
-      return [];
-    }
-    
-    // ヘッダー行をスキップ
-    if (data.length <= 1) {
-      return [];
+    if (!data || !Array.isArray(data) || data.length <= 1) {
+      return JSON.stringify(createSuccessResponse('', { tasks: [], count: 0 }));
     }
     
     const tasks = [];
-    
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if (!row || !Array.isArray(row)) {
-        continue; // 無効な行はスキップ
+        continue;
       }
       
-      // IDが存在し、有効な値の場合のみ処理
       const taskId = row[TASK_COL_ID];
       if (taskId !== null && taskId !== undefined && taskId !== '') {
         tasks.push({
@@ -265,12 +496,14 @@ function getTasks() {
       }
     }
     
-    return tasks;
+    // フロントエンドでnullになる問題を回避するため、JSON文字列化して返す
+    return JSON.stringify(createSuccessResponse('', { tasks: tasks, count: tasks.length }));
   } catch (error) {
     Logger.log('Error in getTasks: ' + error.toString());
-    Logger.log('Error stack: ' + (error.stack || 'No stack trace'));
-    // エラーが発生した場合でも空の配列を返す（フロントエンドでnullチェックを回避）
-    return [];
+    return JSON.stringify(createErrorResponse('タスクの取得中にエラーが発生しました: ' + error.toString(), {
+      tasks: [],
+      count: 0
+    }));
   }
 }
 
@@ -279,39 +512,11 @@ function getTasks() {
  */
 function addTask(taskData) {
   try {
-    let ss;
-    try {
-      ss = getSpreadsheet();
-    } catch (spreadsheetError) {
-      Logger.log('Failed to get spreadsheet in addTask: ' + spreadsheetError.toString());
-      return {
-        error: true,
-        message: 'スプレッドシートを取得できませんでした: ' + spreadsheetError.toString()
-      };
-    }
+    const ss = getSpreadsheet();
+    const tasksSheet = getSheetSafely(ss, SHEET_NAME_TASKS);
     
-    if (!ss) {
-      return {
-        error: true,
-        message: 'スプレッドシートを取得できませんでした（null）'
-      };
-    }
-    
-    let tasksSheet;
-    try {
-      tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
-    } catch (sheetError) {
-      Logger.log('Failed to get sheet by name in addTask: ' + sheetError.toString());
-      return {
-        error: true,
-        message: 'タスクシートの取得に失敗しました: ' + sheetError.toString()
-      };
-    }
-    
-    // シートが存在しない場合は初期化
     if (!tasksSheet) {
-      initializeSpreadsheet();
-      tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
+      return createErrorResponse('タスクシートの取得に失敗しました');
     }
     
     // 新しいIDを生成（現在の最大ID + 1、または1）
@@ -338,17 +543,10 @@ function addTask(taskData) {
     
     tasksSheet.appendRow(newRow);
     
-    return {
-      success: true,
-      id: newId,
-      message: 'タスクが追加されました'
-    };
+    return createSuccessResponse('タスクが追加されました', { id: newId });
   } catch (error) {
     Logger.log('Error in addTask: ' + error.toString());
-    return {
-      error: true,
-      message: error.toString()
-    };
+    return createErrorResponse(error.toString());
   }
 }
 
@@ -357,40 +555,11 @@ function addTask(taskData) {
  */
 function updateTask(taskId, taskData) {
   try {
-    let ss;
-    try {
-      ss = getSpreadsheet();
-    } catch (spreadsheetError) {
-      Logger.log('Failed to get spreadsheet in updateTask: ' + spreadsheetError.toString());
-      return {
-        error: true,
-        message: 'スプレッドシートを取得できませんでした: ' + spreadsheetError.toString()
-      };
-    }
-    
-    if (!ss) {
-      return {
-        error: true,
-        message: 'スプレッドシートを取得できませんでした（null）'
-      };
-    }
-    
-    let tasksSheet;
-    try {
-      tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
-    } catch (sheetError) {
-      Logger.log('Failed to get sheet by name in updateTask: ' + sheetError.toString());
-      return {
-        error: true,
-        message: 'タスクシートの取得に失敗しました: ' + sheetError.toString()
-      };
-    }
+    const ss = getSpreadsheet();
+    const tasksSheet = getSheetSafely(ss, SHEET_NAME_TASKS, false);
     
     if (!tasksSheet) {
-      return {
-        error: true,
-        message: 'タスクシートが見つかりません'
-      };
+      return createErrorResponse('タスクシートが見つかりません');
     }
     
     const data = tasksSheet.getDataRange().getValues();
@@ -405,10 +574,7 @@ function updateTask(taskId, taskData) {
     }
     
     if (rowIndex === -1) {
-      return {
-        error: true,
-        message: 'タスクが見つかりませんでした'
-      };
+      return createErrorResponse('タスクが見つかりませんでした');
     }
     
     // 既存のデータを取得
@@ -417,7 +583,7 @@ function updateTask(taskId, taskData) {
     
     // 更新するデータを準備（指定されていない場合は既存の値を使用）
     const updatedRow = new Array(TASK_COLUMN_COUNT);
-    updatedRow[TASK_COL_ID] = existingRow[TASK_COL_ID]; // IDは変更しない
+    updatedRow[TASK_COL_ID] = existingRow[TASK_COL_ID];
     updatedRow[TASK_COL_TITLE] = taskData.title !== undefined ? taskData.title : existingRow[TASK_COL_TITLE];
     updatedRow[TASK_COL_DESCRIPTION] = taskData.description !== undefined ? taskData.description : existingRow[TASK_COL_DESCRIPTION];
     updatedRow[TASK_COL_ESTIMATED_HOURS] = taskData.estimatedHours !== undefined ? parseFloat(taskData.estimatedHours) : existingRow[TASK_COL_ESTIMATED_HOURS];
@@ -426,23 +592,16 @@ function updateTask(taskId, taskData) {
     updatedRow[TASK_COL_DELIVERABLE] = taskData.deliverable !== undefined ? taskData.deliverable : (existingRow[TASK_COL_DELIVERABLE] || '');
     updatedRow[TASK_COL_DEADLINE] = taskData.deadline !== undefined ? taskData.deadline : (existingRow[TASK_COL_DEADLINE] || '');
     updatedRow[TASK_COL_STATUS] = taskData.status !== undefined ? taskData.status : (existingRow[TASK_COL_STATUS] || '未着手');
-    updatedRow[TASK_COL_CREATED_AT] = existingRow[TASK_COL_CREATED_AT] || ''; // 作成日時は変更しない
-    updatedRow[TASK_COL_UPDATED_AT] = now.toISOString(); // 更新日時を更新
+    updatedRow[TASK_COL_CREATED_AT] = existingRow[TASK_COL_CREATED_AT] || '';
+    updatedRow[TASK_COL_UPDATED_AT] = now.toISOString();
     
     // 行を更新
     tasksSheet.getRange(rowIndex, 1, 1, TASK_COLUMN_COUNT).setValues([updatedRow]);
     
-    return {
-      success: true,
-      id: taskId,
-      message: 'タスクが更新されました'
-    };
+    return createSuccessResponse('タスクが更新されました', { id: taskId });
   } catch (error) {
     Logger.log('Error in updateTask: ' + error.toString());
-    return {
-      error: true,
-      message: error.toString()
-    };
+    return createErrorResponse(error.toString());
   }
 }
 
@@ -451,40 +610,11 @@ function updateTask(taskId, taskData) {
  */
 function deleteTask(taskId) {
   try {
-    let ss;
-    try {
-      ss = getSpreadsheet();
-    } catch (spreadsheetError) {
-      Logger.log('Failed to get spreadsheet in deleteTask: ' + spreadsheetError.toString());
-      return {
-        error: true,
-        message: 'スプレッドシートを取得できませんでした: ' + spreadsheetError.toString()
-      };
-    }
-    
-    if (!ss) {
-      return {
-        error: true,
-        message: 'スプレッドシートを取得できませんでした（null）'
-      };
-    }
-    
-    let tasksSheet;
-    try {
-      tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
-    } catch (sheetError) {
-      Logger.log('Failed to get sheet by name in deleteTask: ' + sheetError.toString());
-      return {
-        error: true,
-        message: 'タスクシートの取得に失敗しました: ' + sheetError.toString()
-      };
-    }
+    const ss = getSpreadsheet();
+    const tasksSheet = getSheetSafely(ss, SHEET_NAME_TASKS, false);
     
     if (!tasksSheet) {
-      return {
-        error: true,
-        message: 'タスクシートが見つかりません'
-      };
+      return createErrorResponse('タスクシートが見つかりません');
     }
     
     const data = tasksSheet.getDataRange().getValues();
@@ -493,32 +623,22 @@ function deleteTask(taskId) {
     // タスクIDで行を検索
     for (let i = 1; i < data.length; i++) {
       if (parseInt(data[i][TASK_COL_ID]) === parseInt(taskId)) {
-        rowIndex = i + 1; // スプレッドシートの行番号は1から始まる
+        rowIndex = i + 1;
         break;
       }
     }
     
     if (rowIndex === -1) {
-      return {
-        error: true,
-        message: 'タスクが見つかりませんでした'
-      };
+      return createErrorResponse('タスクが見つかりませんでした');
     }
     
     // 行を削除
     tasksSheet.deleteRow(rowIndex);
     
-    return {
-      success: true,
-      id: taskId,
-      message: 'タスクが削除されました'
-    };
+    return createSuccessResponse('タスクが削除されました', { id: taskId });
   } catch (error) {
     Logger.log('Error in deleteTask: ' + error.toString());
-    return {
-      error: true,
-      message: error.toString()
-    };
+    return createErrorResponse(error.toString());
   }
 }
 
@@ -529,6 +649,10 @@ function updateTaskStatus(taskId, status) {
   return updateTask(taskId, { status: status });
 }
 
+// ============================================================================
+// カレンダー・負荷計算関数
+// ============================================================================
+
 /**
  * Googleカレンダーから今週の会議予定を取得
  */
@@ -536,15 +660,12 @@ function getCalendarEvents() {
   try {
     const calendar = CalendarApp.getDefaultCalendar();
     if (!calendar) {
-      return {
-        error: true,
-        message: 'デフォルトカレンダーが見つかりません'
-      };
+      return createErrorResponse('デフォルトカレンダーが見つかりません');
     }
     
     const now = new Date();
     const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay()); // 日曜日に設定
+    startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
     
     const endOfWeek = new Date(startOfWeek);
@@ -555,7 +676,7 @@ function getCalendarEvents() {
     const eventsData = events.map(event => {
       const startTime = event.getStartTime();
       const endTime = event.getEndTime();
-      const duration = (endTime - startTime) / (1000 * 60 * 60); // 時間単位
+      const duration = (endTime - startTime) / (1000 * 60 * 60);
       
       return {
         title: event.getTitle(),
@@ -566,7 +687,6 @@ function getCalendarEvents() {
       };
     });
     
-    // 今週の会議時間の合計を計算
     const totalMeetingHours = eventsData.reduce((sum, event) => sum + event.duration, 0);
     
     return {
@@ -577,98 +697,7 @@ function getCalendarEvents() {
     };
   } catch (error) {
     Logger.log('Error in getCalendarEvents: ' + error.toString());
-    return {
-      error: true,
-      message: error.toString()
-    };
-  }
-}
-
-/**
- * 体調スコアを記録（出社時）
- * ヘッダーの体調ステータスボタンから呼び出される
- */
-function recordHealthScore(healthData) {
-  try {
-    let ss;
-    try {
-      ss = getSpreadsheet();
-    } catch (spreadsheetError) {
-      Logger.log('Failed to get spreadsheet in recordHealthScore: ' + spreadsheetError.toString());
-      return {
-        error: true,
-        message: 'スプレッドシートを取得できませんでした: ' + spreadsheetError.toString()
-      };
-    }
-    
-    if (!ss) {
-      return {
-        error: true,
-        message: 'スプレッドシートを取得できませんでした（null）'
-      };
-    }
-    
-    const date = healthData.date || new Date().toISOString().split('T')[0];
-    const score = healthData.score || '普通'; // 良い/普通/良くない
-    
-    // 日報シートに出社時体調を保存
-    let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
-    if (!reportSheet) {
-      initializeSpreadsheet();
-      reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
-    }
-    
-    if (reportSheet) {
-      const data = reportSheet.getDataRange().getValues();
-      let found = false;
-      
-      // 既存の行を検索
-      for (let i = 1; i < data.length; i++) {
-        const rowDate = data[i][REPORT_COL_DATE];
-        let rowDateStr = '';
-        
-        if (rowDate instanceof Date) {
-          rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-        } else if (typeof rowDate === 'string') {
-          rowDateStr = rowDate.split(' ')[0];
-        }
-        
-        if (rowDateStr === date) {
-          // 出社時体調を更新
-          reportSheet.getRange(i + 1, REPORT_COL_ARRIVAL_HEALTH + 1).setValue(score);
-          found = true;
-          break;
-        }
-      }
-      
-      // 見つからない場合は新規追加
-      if (!found) {
-        const newRow = new Array(REPORT_COLUMN_COUNT);
-        newRow[REPORT_COL_DATE] = date;
-        newRow[REPORT_COL_GOAL] = '';
-        newRow[REPORT_COL_ARRIVAL_HEALTH] = score;
-        newRow[REPORT_COL_DEPARTURE_HEALTH] = '';
-        newRow[REPORT_COL_COMPLETED_TASK_COUNT] = 0;
-        newRow[REPORT_COL_COMPLETED_TASK_HOURS] = 0;
-        newRow[REPORT_COL_REFLECTION] = '';
-        newRow[REPORT_COL_TOMORROW_PLAN] = '';
-        newRow[REPORT_COL_RECORDED_AT] = new Date();
-        reportSheet.appendRow(newRow);
-      }
-    }
-    
-    
-    return {
-      success: true,
-      date: date,
-      message: '出社時体調が記録されました'
-    };
-  } catch (error) {
-    Logger.log('Error in recordHealthScore: ' + error.toString());
-    return {
-      error: true,
-      message: error.toString()
-    };
+    return createErrorResponse(error.toString());
   }
 }
 
@@ -677,29 +706,20 @@ function recordHealthScore(healthData) {
  */
 function getWeeklyWorkload() {
   try {
-    const tasks = getTasks();
+    const tasksResult = getTasks();
+    const tasksData = parseTasksResult(tasksResult);
     
-    // エラーチェック
-    if (tasks.error) {
-      return {
-        error: true,
-        message: 'タスクの取得に失敗しました: ' + tasks.message
-      };
+    if (tasksData.error || !tasksData.success) {
+      return createErrorResponse('タスクの取得に失敗しました: ' + (tasksData.message || '不明なエラー'));
     }
     
-    // tasksが配列でない場合の処理
+    const tasks = tasksData.tasks || [];
     if (!Array.isArray(tasks)) {
-      return {
-        error: true,
-        message: 'タスクデータの形式が正しくありません'
-      };
+      return createErrorResponse('タスクデータの形式が正しくありません');
     }
     
     const calendarData = getCalendarEvents();
-    
-    // カレンダーデータのエラーチェック
     if (calendarData.error) {
-      // カレンダーエラーは警告として扱い、会議時間を0として続行
       Logger.log('カレンダー取得エラー: ' + calendarData.message);
     }
     
@@ -711,13 +731,8 @@ function getWeeklyWorkload() {
       sum + (parseFloat(task.estimatedHours) || 0), 0
     );
     
-    // 会議時間
     const meetingHours = (calendarData.error ? 0 : (calendarData.totalMeetingHours || 0));
-    
-    // 合計時間
     const totalHours = totalTaskHours + meetingHours;
-    
-    // 余力
     const availableHours = 40 - totalHours;
     const utilizationRate = (totalHours / 40) * 100;
     
@@ -731,10 +746,47 @@ function getWeeklyWorkload() {
     };
   } catch (error) {
     Logger.log('Error in getWeeklyWorkload: ' + error.toString());
-    return {
-      error: true,
-      message: error.toString()
-    };
+    return createErrorResponse(error.toString());
+  }
+}
+
+// ============================================================================
+// 日報管理関数
+// ============================================================================
+
+/**
+ * 体調スコアを記録（出社時）
+ * ヘッダーの体調ステータスボタンから呼び出される
+ */
+function recordHealthScore(healthData) {
+  try {
+    const ss = getSpreadsheet();
+    const reportSheet = getSheetSafely(ss, SHEET_NAME_REPORT);
+    
+    if (!reportSheet) {
+      return createErrorResponse('日報シートの取得に失敗しました');
+    }
+    
+    const date = healthData.date || new Date().toISOString().split('T')[0];
+    const score = healthData.score || '普通';
+    
+    const rowIndex = findReportRow(reportSheet, date);
+    
+    if (rowIndex > 0) {
+      // 既存の行を更新
+      reportSheet.getRange(rowIndex, REPORT_COL_ARRIVAL_HEALTH + 1).setValue(score);
+    } else {
+      // 新規追加
+      const newRow = createReportRow(date, {
+        arrivalHealthScore: score
+      });
+      reportSheet.appendRow(newRow);
+    }
+    
+    return createSuccessResponse('出社時体調が記録されました', { date: date });
+  } catch (error) {
+    Logger.log('Error in recordHealthScore: ' + error.toString());
+    return createErrorResponse(error.toString());
   }
 }
 
@@ -746,66 +798,27 @@ function getWeeklyWorkload() {
 function saveDailyGoal(date, goal) {
   try {
     const ss = getSpreadsheet();
-    let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+    const reportSheet = getSheetSafely(ss, SHEET_NAME_REPORT);
     
     if (!reportSheet) {
-      // 日報シートが存在しない場合は初期化を実行
-      initializeSpreadsheet();
-      reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
-      if (!reportSheet) {
-        return {
-          error: true,
-          message: '日報シートが見つかりません。初期化を実行してください。'
-        };
-      }
+      return createErrorResponse('日報シートが見つかりません。初期化を実行してください。');
     }
     
-    const data = reportSheet.getDataRange().getValues();
-    let found = false;
+    const rowIndex = findReportRow(reportSheet, date);
     
-    // 既存の行を検索
-    for (let i = 1; i < data.length; i++) {
-      const rowDate = data[i][REPORT_COL_DATE];
-      if (rowDate instanceof Date) {
-        const rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-        if (rowDateStr === date) {
-          // 既存の行を更新
-          reportSheet.getRange(i + 1, REPORT_COL_GOAL + 1).setValue(goal);
-          found = true;
-          break;
-        }
-      } else if (rowDate === date) {
-        reportSheet.getRange(i + 1, REPORT_COL_GOAL + 1).setValue(goal);
-        found = true;
-        break;
-      }
-    }
-    
-    // 見つからない場合は新規追加
-    if (!found) {
-      const newRow = new Array(REPORT_COLUMN_COUNT);
-      newRow[REPORT_COL_DATE] = date;
-      newRow[REPORT_COL_GOAL] = goal;
-      newRow[REPORT_COL_ARRIVAL_HEALTH] = '';
-      newRow[REPORT_COL_DEPARTURE_HEALTH] = '';
-      newRow[REPORT_COL_COMPLETED_TASK_COUNT] = 0;
-      newRow[REPORT_COL_COMPLETED_TASK_HOURS] = 0;
-      newRow[REPORT_COL_REFLECTION] = '';
-      newRow[REPORT_COL_TOMORROW_PLAN] = '';
-      newRow[REPORT_COL_RECORDED_AT] = new Date();
+    if (rowIndex > 0) {
+      // 既存の行を更新
+      reportSheet.getRange(rowIndex, REPORT_COL_GOAL + 1).setValue(goal);
+    } else {
+      // 新規追加
+      const newRow = createReportRow(date, { goal: goal });
       reportSheet.appendRow(newRow);
     }
     
-    return {
-      success: true,
-      message: '目標が保存されました'
-    };
+    return createSuccessResponse('目標が保存されました');
   } catch (error) {
     Logger.log('Error in saveDailyGoal: ' + error.toString());
-    return {
-      error: true,
-      message: error.toString()
-    };
+    return createErrorResponse(error.toString());
   }
 }
 
@@ -816,28 +829,20 @@ function saveDailyGoal(date, goal) {
 function getDailyGoal(date) {
   try {
     const ss = getSpreadsheet();
-    let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+    const reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
     
     if (!reportSheet) {
-      return ''; // シートが存在しない場合は空文字を返す
+      return '';
     }
     
-    const data = reportSheet.getDataRange().getValues();
+    const rowIndex = findReportRow(reportSheet, date);
     
-    // 日付に一致する行を検索
-    for (let i = 1; i < data.length; i++) {
-      const rowDate = data[i][REPORT_COL_DATE];
-      if (rowDate instanceof Date) {
-        const rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-        if (rowDateStr === date) {
-          return data[i][REPORT_COL_GOAL] || '';
-        }
-      } else if (rowDate === date) {
-        return data[i][REPORT_COL_GOAL] || '';
-      }
+    if (rowIndex > 0) {
+      const data = reportSheet.getDataRange().getValues();
+      return data[rowIndex - 1][REPORT_COL_GOAL] || '';
     }
     
-    return ''; // 見つからない場合は空文字
+    return '';
   } catch (error) {
     Logger.log('Error in getDailyGoal: ' + error.toString());
     return '';
@@ -850,18 +855,19 @@ function getDailyGoal(date) {
  */
 function getCompletedTasksToday(date) {
   try {
-    const tasks = getTasks();
+    const tasksResult = getTasks();
+    const tasksData = parseTasksResult(tasksResult);
     
-    if (tasks.error || !Array.isArray(tasks)) {
-      return {
-        count: 0,
-        totalHours: 0,
-        tasks: []
-      };
+    if (tasksData.error || !tasksData.success) {
+      return { count: 0, totalHours: 0, tasks: [] };
     }
     
-    const today = new Date(date);
-    const todayStr = Utilities.formatDate(today, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    const tasks = tasksData.tasks || [];
+    if (!Array.isArray(tasks)) {
+      return { count: 0, totalHours: 0, tasks: [] };
+    }
+    
+    const todayStr = formatDateToString(new Date(date));
     
     // 今日完了したタスクをフィルタリング
     const completedTasks = tasks.filter(task => {
@@ -869,10 +875,8 @@ function getCompletedTasksToday(date) {
         return false;
       }
       
-      // 更新日時が今日かどうかを確認
       if (task.updatedAt) {
-        const updatedDate = new Date(task.updatedAt);
-        const updatedDateStr = Utilities.formatDate(updatedDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        const updatedDateStr = formatDateToString(new Date(task.updatedAt));
         return updatedDateStr === todayStr;
       }
       
@@ -909,84 +913,52 @@ function getCompletedTasksToday(date) {
  * @param {Object} reportData - 日報データ
  * @param {string} reportData.date - 日付（YYYY-MM-DD形式）
  * @param {string} reportData.goal - 目標
- * @param {string} reportData.healthScore - 体調スコア
+ * @param {string} reportData.healthScore - 退社時体調スコア
  * @param {string} reportData.reflection - 振り返り
  * @param {string} reportData.tomorrowPlan - 明日の予定
  */
 function recordDailyReport(reportData) {
   try {
     const ss = getSpreadsheet();
-    let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+    const reportSheet = getSheetSafely(ss, SHEET_NAME_REPORT);
     
     if (!reportSheet) {
-      // 日報シートが存在しない場合は初期化を実行
-      initializeSpreadsheet();
-      reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
-      if (!reportSheet) {
-        return {
-          error: true,
-          message: '日報シートが見つかりません。初期化を実行してください。'
-        };
-      }
+      return createErrorResponse('日報シートが見つかりません。初期化を実行してください。');
     }
     
     // 今日完了したタスクを取得
     const completedTasks = getCompletedTasksToday(reportData.date);
     
-    const data = reportSheet.getDataRange().getValues();
-    let found = false;
+    const rowIndex = findReportRow(reportSheet, reportData.date);
     
-    // 既存の行を検索
-    for (let i = 1; i < data.length; i++) {
-      const rowDate = data[i][REPORT_COL_DATE];
-      let rowDateStr = '';
-      
-      if (rowDate instanceof Date) {
-        rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-      } else if (typeof rowDate === 'string') {
-        rowDateStr = rowDate.split(' ')[0]; // 日付部分のみ取得
-      }
-      
-      if (rowDateStr === reportData.date) {
-        // 既存の行を更新
-        reportSheet.getRange(i + 1, REPORT_COL_GOAL + 1).setValue(reportData.goal || '');
-        // 出社時体調は既存の値を保持（更新しない）
-        reportSheet.getRange(i + 1, REPORT_COL_DEPARTURE_HEALTH + 1).setValue(reportData.healthScore || '');
-        reportSheet.getRange(i + 1, REPORT_COL_COMPLETED_TASK_COUNT + 1).setValue(completedTasks.count || 0);
-        reportSheet.getRange(i + 1, REPORT_COL_COMPLETED_TASK_HOURS + 1).setValue(completedTasks.totalHours || 0);
-        reportSheet.getRange(i + 1, REPORT_COL_REFLECTION + 1).setValue(reportData.reflection || '');
-        reportSheet.getRange(i + 1, REPORT_COL_TOMORROW_PLAN + 1).setValue(reportData.tomorrowPlan || '');
-        reportSheet.getRange(i + 1, REPORT_COL_RECORDED_AT + 1).setValue(new Date());
-        found = true;
-        break;
-      }
-    }
-    
-    // 見つからない場合は新規追加
-    if (!found) {
-      const newRow = new Array(REPORT_COLUMN_COUNT);
-      newRow[REPORT_COL_DATE] = reportData.date;
-      newRow[REPORT_COL_GOAL] = reportData.goal || '';
-      newRow[REPORT_COL_ARRIVAL_HEALTH] = reportData.arrivalHealthScore || '';
-      newRow[REPORT_COL_DEPARTURE_HEALTH] = reportData.healthScore || '';
-      newRow[REPORT_COL_COMPLETED_TASK_COUNT] = completedTasks.count || 0;
-      newRow[REPORT_COL_COMPLETED_TASK_HOURS] = completedTasks.totalHours || 0;
-      newRow[REPORT_COL_REFLECTION] = reportData.reflection || '';
-      newRow[REPORT_COL_TOMORROW_PLAN] = reportData.tomorrowPlan || '';
-      newRow[REPORT_COL_RECORDED_AT] = new Date();
+    if (rowIndex > 0) {
+      // 既存の行を更新
+      reportSheet.getRange(rowIndex, REPORT_COL_GOAL + 1).setValue(reportData.goal || '');
+      // 出社時体調は既存の値を保持（更新しない）
+      reportSheet.getRange(rowIndex, REPORT_COL_DEPARTURE_HEALTH + 1).setValue(reportData.healthScore || '');
+      reportSheet.getRange(rowIndex, REPORT_COL_COMPLETED_TASK_COUNT + 1).setValue(completedTasks.count || 0);
+      reportSheet.getRange(rowIndex, REPORT_COL_COMPLETED_TASK_HOURS + 1).setValue(completedTasks.totalHours || 0);
+      reportSheet.getRange(rowIndex, REPORT_COL_REFLECTION + 1).setValue(reportData.reflection || '');
+      reportSheet.getRange(rowIndex, REPORT_COL_TOMORROW_PLAN + 1).setValue(reportData.tomorrowPlan || '');
+      reportSheet.getRange(rowIndex, REPORT_COL_RECORDED_AT + 1).setValue(new Date());
+    } else {
+      // 新規追加
+      const newRow = createReportRow(reportData.date, {
+        goal: reportData.goal || '',
+        arrivalHealthScore: reportData.arrivalHealthScore || '',
+        departureHealthScore: reportData.healthScore || '',
+        completedTaskCount: completedTasks.count || 0,
+        completedTaskHours: completedTasks.totalHours || 0,
+        reflection: reportData.reflection || '',
+        tomorrowPlan: reportData.tomorrowPlan || ''
+      });
       reportSheet.appendRow(newRow);
     }
     
-    return {
-      success: true,
-      message: '日報が保存されました'
-    };
+    return createSuccessResponse('日報が保存されました');
   } catch (error) {
     Logger.log('Error in recordDailyReport: ' + error.toString());
-    return {
-      error: true,
-      message: error.toString()
-    };
+    return createErrorResponse(error.toString());
   }
 }
 
@@ -997,7 +969,7 @@ function recordDailyReport(reportData) {
 function getDailyReport(date) {
   try {
     const ss = getSpreadsheet();
-    let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+    const reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
     
     if (!reportSheet) {
       return {
@@ -1005,7 +977,7 @@ function getDailyReport(date) {
         date: date,
         goal: '',
         arrivalHealthScore: '',
-        healthScore: '', // 退社時体調
+        healthScore: '',
         completedTaskCount: 0,
         completedTaskHours: 0,
         reflection: '',
@@ -1013,32 +985,23 @@ function getDailyReport(date) {
       };
     }
     
-    const data = reportSheet.getDataRange().getValues();
+    const rowIndex = findReportRow(reportSheet, date);
     
-    // 日付に一致する行を検索
-    for (let i = 1; i < data.length; i++) {
-      const rowDate = data[i][REPORT_COL_DATE];
-      let rowDateStr = '';
+    if (rowIndex > 0) {
+      const data = reportSheet.getDataRange().getValues();
+      const row = data[rowIndex - 1];
       
-      if (rowDate instanceof Date) {
-        rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-      } else if (typeof rowDate === 'string') {
-        rowDateStr = rowDate.split(' ')[0]; // 日付部分のみ取得
-      }
-      
-      if (rowDateStr === date) {
-        return {
-          error: false,
-          date: date,
-          goal: data[i][REPORT_COL_GOAL] || '',
-          arrivalHealthScore: data[i][REPORT_COL_ARRIVAL_HEALTH] || '',
-          healthScore: data[i][REPORT_COL_DEPARTURE_HEALTH] || '',
-          completedTaskCount: data[i][REPORT_COL_COMPLETED_TASK_COUNT] || 0,
-          completedTaskHours: data[i][REPORT_COL_COMPLETED_TASK_HOURS] || 0,
-          reflection: data[i][REPORT_COL_REFLECTION] || '',
-          tomorrowPlan: data[i][REPORT_COL_TOMORROW_PLAN] || ''
-        };
-      }
+      return {
+        error: false,
+        date: date,
+        goal: row[REPORT_COL_GOAL] || '',
+        arrivalHealthScore: row[REPORT_COL_ARRIVAL_HEALTH] || '',
+        healthScore: row[REPORT_COL_DEPARTURE_HEALTH] || '',
+        completedTaskCount: row[REPORT_COL_COMPLETED_TASK_COUNT] || 0,
+        completedTaskHours: row[REPORT_COL_COMPLETED_TASK_HOURS] || 0,
+        reflection: row[REPORT_COL_REFLECTION] || '',
+        tomorrowPlan: row[REPORT_COL_TOMORROW_PLAN] || ''
+      };
     }
     
     // 見つからない場合は空のデータを返す
@@ -1047,7 +1010,7 @@ function getDailyReport(date) {
       date: date,
       goal: '',
       arrivalHealthScore: '',
-      healthScore: '', // 退社時体調
+      healthScore: '',
       completedTaskCount: 0,
       completedTaskHours: 0,
       reflection: '',
@@ -1055,10 +1018,6 @@ function getDailyReport(date) {
     };
   } catch (error) {
     Logger.log('Error in getDailyReport: ' + error.toString());
-    return {
-      error: true,
-      message: error.toString()
-    };
+    return createErrorResponse(error.toString());
   }
 }
-

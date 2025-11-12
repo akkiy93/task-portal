@@ -933,7 +933,7 @@
               <button type="button" class="health-status-btn" data-score="普通" onclick="setHealthStatus('普通', this)">普通</button>
               <button type="button" class="health-status-btn bad" data-score="良くない" onclick="setHealthStatus('良くない', this)">良くない</button>
             </div>
-            <button type="button" id="save-goal-btn" class="btn btn-primary btn-small" onclick="saveDailyGoal()">保存</button>
+            <button type="button" id="save-goal-btn" class="btn btn-primary btn-small">保存</button>
           </div>
         </div>
       </div>
@@ -1235,10 +1235,14 @@
     
     // ページ読み込み時にデータを取得
     window.onload = function() {
-      loadData();
       startClock();
+      
+      // 目標と体調を先に読み込む
       loadTodayGoal();
       loadTodayHealth();
+      
+      // その後にタスク関連のデータを読み込む
+      loadData();
       
       // 日報フォームの日付を今日に設定
       const today = new Date().toISOString().split('T')[0];
@@ -1294,20 +1298,25 @@
     // 今日の目標を読み込む
     function loadTodayGoal() {
       const today = new Date().toISOString().split('T')[0];
-      callGasWithLoading(null, function(enableButton) {
-        return google.script.run
-          .withSuccessHandler(function(goal) {
-            enableButton();
-            if (goal && !goal.error) {
-              document.getElementById('daily-goal').value = goal || '';
-            }
-          })
-          .withFailureHandler(function(error) {
-            enableButton();
+      const goalInput = document.getElementById('daily-goal');
+      if (!goalInput) return;
+      
+      google.script.run
+        .withSuccessHandler(function(goal) {
+          console.log('loadTodayGoal: 取得した目標:', goal);
+          // getDailyGoal()は文字列を返す
+          if (goal && typeof goal === 'string') {
+            goalInput.value = goal;
+          } else if (goal && typeof goal === 'object' && goal.error) {
+            console.warn('loadTodayGoal: エラー:', goal.message);
             // エラーは無視（目標が未設定の場合もある）
-          })
-          .getDailyGoal(today);
-      });
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.warn('loadTodayGoal: エラー（無視）:', error);
+          // エラーは無視（目標が未設定の場合もある）
+        })
+        .getDailyGoal(today);
     }
     
     // 今日の目標を保存
@@ -1373,27 +1382,28 @@
     // 今日の体調を読み込む（日報シートから）
     function loadTodayHealth() {
       const today = new Date().toISOString().split('T')[0];
-      callGasWithLoading(null, function(enableButton) {
-        return google.script.run
-          .withSuccessHandler(function(report) {
-            enableButton();
-            if (report && !report.error && report.arrivalHealthScore) {
-              // 出社時体調を取得してボタンを選択状態にする
-              const button = document.querySelector(`.health-status-btn[data-score="${report.arrivalHealthScore}"]`);
-              if (button) {
-                document.querySelectorAll('.health-status-btn').forEach(btn => {
-                  btn.classList.remove('selected');
-                });
-                button.classList.add('selected');
-              }
+      google.script.run
+        .withSuccessHandler(function(report) {
+          console.log('loadTodayHealth: 取得した日報:', report);
+          if (report && !report.error && report.arrivalHealthScore) {
+            // 出社時体調を取得してボタンを選択状態にする
+            const button = document.querySelector(`.health-status-btn[data-score="${report.arrivalHealthScore}"]`);
+            if (button) {
+              document.querySelectorAll('.health-status-btn').forEach(btn => {
+                btn.classList.remove('selected');
+              });
+              button.classList.add('selected');
+              console.log('loadTodayHealth: 体調ボタンを選択:', report.arrivalHealthScore);
             }
-          })
-          .withFailureHandler(function(error) {
-            enableButton();
-            // エラーは無視（体調が未記録の場合もある）
-          })
-          .getDailyReport(today);
-      });
+          } else {
+            console.log('loadTodayHealth: 体調データなしまたはエラー');
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.warn('loadTodayHealth: エラー（無視）:', error);
+          // エラーは無視（体調が未記録の場合もある）
+        })
+        .getDailyReport(today);
     }
     // データを読み込む
     function loadData() {
@@ -1408,14 +1418,144 @@
     let currentSortOrder = 'desc'; // 'asc' or 'desc'
     let showCompleted = false; // デフォルトで完了タスクを非表示
     
-    // タスク一覧を読み込む
-    function loadTasks() {
+    // デバッグ用: スプレッドシートの状態を確認
+    function debugSpreadsheetStatus() {
+      console.log('=== DEBUG: スプレッドシート状態確認開始 ===');
+      google.script.run
+        .withSuccessHandler(function(status) {
+          console.log('DEBUG: スプレッドシート状態:', status);
+          if (status.error) {
+            console.error('DEBUG: エラー:', status.message);
+            if (status.stack) {
+              console.error('DEBUG: スタック:', status.stack);
+            }
+          } else {
+            console.log('DEBUG: スプレッドシートID:', status.spreadsheetId);
+            console.log('DEBUG: スプレッドシート名:', status.spreadsheetName);
+            console.log('DEBUG: タスクシート:', status.tasksSheet);
+            console.log('DEBUG: 日報シート:', status.reportSheet);
+          }
+          console.log('=== DEBUG: スプレッドシート状態確認完了 ===');
+        })
+        .withFailureHandler(function(error) {
+          console.error('DEBUG: スプレッドシート状態確認失敗:', error);
+        })
+        .debugSpreadsheetStatus();
+    }
+    
+    // デバッグ用: getTasks()の動作を確認
+    function debugGetTasks() {
+      console.log('=== DEBUG: getTasks()動作確認開始 ===');
       google.script.run
         .withSuccessHandler(function(tasks) {
-          allTasks = tasks;
-          applyFiltersAndSort();
+          console.log('DEBUG: getTasks()成功');
+          console.log('DEBUG: 取得データ:', tasks);
+          console.log('DEBUG: データ型:', typeof tasks);
+          console.log('DEBUG: 配列か:', Array.isArray(tasks));
+          console.log('DEBUG: データ数:', tasks ? tasks.length : 0);
+          
+          if (tasks && Array.isArray(tasks) && tasks.length > 0) {
+            console.log('DEBUG: 最初のタスク:', tasks[0]);
+            console.log('DEBUG: 全タスク:', JSON.stringify(tasks, null, 2));
+          }
+          
+          // 表示関数に渡すテスト
+          console.log('=== DEBUG: displayTasks()に渡すテスト ===');
+          displayTasks(tasks);
+          console.log('=== DEBUG: getTasks()動作確認完了 ===');
         })
-        .withFailureHandler(showError)
+        .withFailureHandler(function(error) {
+          console.error('DEBUG: getTasks()失敗:', error);
+        })
+        .debugGetTasks();
+    }
+    
+    // タスク一覧を読み込む
+    function loadTasks() {
+      console.log('=== loadTasks() 開始 ===');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          console.log('loadTasks success handler received:', result);
+          console.log('result type:', typeof result);
+          console.log('result isArray:', Array.isArray(result));
+          
+          let tasks = [];
+          let parsedResult = null;
+          
+          // JSON文字列の場合
+          if (typeof result === 'string') {
+            try {
+              console.log('loadTasks: JSON文字列として受け取り、パースを試行');
+              parsedResult = JSON.parse(result);
+              console.log('loadTasks: JSONパース成功:', parsedResult);
+            } catch (parseError) {
+              console.error('loadTasks: JSONパースエラー:', parseError);
+              allTasks = [];
+              applyFiltersAndSort();
+              showError('データの解析に失敗しました');
+              return;
+            }
+          } 
+          // オブジェクトの場合
+          else if (result && typeof result === 'object' && !Array.isArray(result)) {
+            parsedResult = result;
+          }
+          // nullやundefinedの場合
+          else if (!result) {
+            console.log('loadTasks: nullまたはundefinedを受け取りました');
+            allTasks = [];
+            applyFiltersAndSort();
+            return;
+          }
+          // 配列で直接返されている場合（後方互換性）
+          else if (Array.isArray(result)) {
+            console.log('loadTasks: 配列形式で受け取り');
+            tasks = result;
+            allTasks = tasks;
+            applyFiltersAndSort();
+            return;
+          }
+          // その他の場合
+          else {
+            console.warn('loadTasks: 予期しない形式:', result);
+            allTasks = [];
+            applyFiltersAndSort();
+            return;
+          }
+          
+          // parsedResultからtasksを抽出
+          if (parsedResult) {
+            if (parsedResult.success && Array.isArray(parsedResult.tasks)) {
+              console.log('loadTasks: オブジェクト形式で受け取り、tasks配列を抽出');
+              tasks = parsedResult.tasks;
+            } else if (parsedResult.error) {
+              console.error('loadTasks: エラーオブジェクトを受け取りました:', parsedResult);
+              allTasks = [];
+              applyFiltersAndSort();
+              showError(parsedResult.message || 'タスクの取得に失敗しました');
+              return;
+            } else {
+              console.warn('loadTasks: 予期しないオブジェクト形式:', parsedResult);
+              tasks = [];
+            }
+          }
+          
+          console.log('loadTasks: 最終的なタスク数:', tasks.length);
+          console.log('loadTasks: 最終的なタスク:', JSON.stringify(tasks, null, 2));
+          allTasks = tasks;
+          
+          console.log('loadTasks: applyFiltersAndSort()を呼び出し');
+          applyFiltersAndSort();
+          console.log('=== loadTasks() 完了 ===');
+        })
+        .withFailureHandler(function(error) {
+          console.error('getTasks failed:', error);
+          console.error('getTasks error type:', typeof error);
+          console.error('getTasks error details:', JSON.stringify(error, null, 2));
+          allTasks = [];
+          applyFiltersAndSort();
+          showError(error);
+        })
         .getTasks();
     }
     
@@ -1429,15 +1569,22 @@
     
     // 完了タスクのフィルタリング
     function filterCompletedTasks(tasks, showCompleted) {
+      if (!tasks || !Array.isArray(tasks)) {
+        return [];
+      }
       if (showCompleted) {
         return tasks;
       }
-      return tasks.filter(task => task.status !== '完了');
+      return tasks.filter(task => task && task.status !== '完了');
     }
     
     // タスクのソート
     function sortTasks(tasks, sortBy, sortOrder) {
+      if (!tasks || !Array.isArray(tasks)) {
+        return [];
+      }
       const sorted = [...tasks].sort((a, b) => {
+        if (!a || !b) return 0; // nullチェック
         let aVal, bVal;
         
         switch(sortBy) {
@@ -1507,8 +1654,17 @@
     // タスク件数情報を更新
     function updateTaskCountInfo(allTasks, filteredTasks) {
       const countInfo = document.getElementById('task-count-info');
+      if (!countInfo) return;
+      
+      if (!allTasks || !Array.isArray(allTasks)) {
+        allTasks = [];
+      }
+      if (!filteredTasks || !Array.isArray(filteredTasks)) {
+        filteredTasks = [];
+      }
+      
       const totalCount = allTasks.length;
-      const completedCount = allTasks.filter(t => t.status === '完了').length;
+      const completedCount = allTasks.filter(t => t && t.status === '完了').length;
       const activeCount = totalCount - completedCount;
       const displayedCount = filteredTasks.length;
       
@@ -1521,17 +1677,36 @@
     
     // タスク一覧を表示
     function displayTasks(tasks) {
-      const taskList = document.getElementById('task-list');
+      console.log('=== displayTasks() 開始 ===');
+      console.log('displayTasks: 受け取ったデータ:', tasks);
+      console.log('displayTasks: データ型:', typeof tasks);
+      console.log('displayTasks: 配列か:', Array.isArray(tasks));
       
-      if (tasks.error) {
+      const taskList = document.getElementById('task-list');
+      if (!taskList) {
+        console.error('displayTasks: task-list要素が見つかりません');
+        return;
+      }
+      
+      if (tasks && tasks.error) {
+        console.error('displayTasks: エラーオブジェクトを受け取りました:', tasks);
         taskList.innerHTML = '<div class="error">エラー: ' + tasks.message + '</div>';
         return;
       }
       
+      if (!tasks || !Array.isArray(tasks)) {
+        console.warn('displayTasks: 無効なデータを受け取りました:', tasks);
+        taskList.innerHTML = '<div class="error">タスクデータの形式が正しくありません</div>';
+        return;
+      }
+      
       if (tasks.length === 0) {
+        console.log('displayTasks: タスクが0件');
         taskList.innerHTML = '<div class="loading">タスクがありません</div>';
         return;
       }
+      
+      console.log('displayTasks: 表示するタスク数:', tasks.length);
       
       let html = '';
       tasks.forEach(task => {
@@ -1570,7 +1745,9 @@
         `;
       });
       
+      console.log('displayTasks: HTML生成完了、要素に設定');
       taskList.innerHTML = html;
+      console.log('=== displayTasks() 完了 ===');
     }
     
     // 労働負荷を読み込む
@@ -2054,4 +2231,5 @@
   </script>
 </body>
 </html>
+
 
