@@ -132,7 +132,7 @@ function include(filename) {
 function initializeSpreadsheet() {
   const ss = getSpreadsheet();
   
-  // タスクシートの作成
+  // タスクシートの作成（存在しない場合のみ）
   let tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
   const TASK_HEADERS = [
     'ID', 'タイトル', '説明', '見積もり時間（時間）', '優先度', 
@@ -140,27 +140,14 @@ function initializeSpreadsheet() {
   ];
   
   if (!tasksSheet) {
-    // 新規作成
     tasksSheet = ss.insertSheet(SHEET_NAME_TASKS);
     const headerRange = tasksSheet.getRange(1, 1, 1, TASK_COLUMN_COUNT);
     headerRange.setValues([TASK_HEADERS]);
     headerRange.setFontWeight('bold');
     tasksSheet.setFrozenRows(1);
-  } else {
-    // 既存シートのヘッダーを確認・更新
-    const lastColumn = tasksSheet.getLastColumn();
-    const headers = tasksSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
-    
-    // ヘッダーが一致しない場合は更新
-    if (lastColumn !== TASK_COLUMN_COUNT || 
-        !TASK_HEADERS.every((header, idx) => headers[idx] === header)) {
-      const headerRange = tasksSheet.getRange(1, 1, 1, TASK_COLUMN_COUNT);
-      headerRange.setValues([TASK_HEADERS]);
-      headerRange.setFontWeight('bold');
-    }
   }
   
-  // 日報シートの作成
+  // 日報シートの作成（存在しない場合のみ）
   let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
   const REPORT_HEADERS = [
     '日付', '目標', '出社時体調', '退社時体調', 
@@ -168,24 +155,11 @@ function initializeSpreadsheet() {
   ];
   
   if (!reportSheet) {
-    // 新規作成
     reportSheet = ss.insertSheet(SHEET_NAME_REPORT);
     const headerRange = reportSheet.getRange(1, 1, 1, REPORT_COLUMN_COUNT);
     headerRange.setValues([REPORT_HEADERS]);
     headerRange.setFontWeight('bold');
     reportSheet.setFrozenRows(1);
-  } else {
-    // 既存シートのヘッダーを確認・更新
-    const lastColumn = reportSheet.getLastColumn();
-    const headers = reportSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
-    
-    // ヘッダーが一致しない場合は更新
-    if (lastColumn !== REPORT_COLUMN_COUNT || 
-        !REPORT_HEADERS.every((header, idx) => headers[idx] === header)) {
-      const headerRange = reportSheet.getRange(1, 1, 1, REPORT_COLUMN_COUNT);
-      headerRange.setValues([REPORT_HEADERS]);
-      headerRange.setFontWeight('bold');
-    }
   }
   
   return {
@@ -247,7 +221,17 @@ function getTasks() {
       }
     }
     
-    const data = tasksSheet.getDataRange().getValues();
+    const dataRange = tasksSheet.getDataRange();
+    if (!dataRange) {
+      Logger.log('getDataRange returned null');
+      return [];
+    }
+    
+    const data = dataRange.getValues();
+    if (!data || !Array.isArray(data)) {
+      Logger.log('getValues returned null or not an array');
+      return [];
+    }
     
     // ヘッダー行をスキップ
     if (data.length <= 1) {
@@ -258,9 +242,15 @@ function getTasks() {
     
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      if (row[TASK_COL_ID]) { // IDが存在する場合のみ
+      if (!row || !Array.isArray(row)) {
+        continue; // 無効な行はスキップ
+      }
+      
+      // IDが存在し、有効な値の場合のみ処理
+      const taskId = row[TASK_COL_ID];
+      if (taskId !== null && taskId !== undefined && taskId !== '') {
         tasks.push({
-          id: row[TASK_COL_ID],
+          id: taskId,
           title: row[TASK_COL_TITLE] || '',
           description: row[TASK_COL_DESCRIPTION] || '',
           estimatedHours: row[TASK_COL_ESTIMATED_HOURS] || 0,
@@ -279,10 +269,8 @@ function getTasks() {
   } catch (error) {
     Logger.log('Error in getTasks: ' + error.toString());
     Logger.log('Error stack: ' + (error.stack || 'No stack trace'));
-    return {
-      error: true,
-      message: 'タスクの取得中にエラーが発生しました: ' + error.toString()
-    };
+    // エラーが発生した場合でも空の配列を返す（フロントエンドでnullチェックを回避）
+    return [];
   }
 }
 
