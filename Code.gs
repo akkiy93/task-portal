@@ -15,6 +15,32 @@ const SHEET_NAME_TASKS = 'タスク';
 const SHEET_NAME_CALENDAR = 'カレンダー';
 const SHEET_NAME_REPORT = '日報';
 
+// タスクシートの列インデックス（0始まり）
+const TASK_COL_ID = 0;
+const TASK_COL_TITLE = 1;
+const TASK_COL_DESCRIPTION = 2;
+const TASK_COL_ESTIMATED_HOURS = 3;
+const TASK_COL_PRIORITY = 4;
+const TASK_COL_IMPORTANCE = 5;
+const TASK_COL_DELIVERABLE = 6;
+const TASK_COL_DEADLINE = 7;
+const TASK_COL_STATUS = 8;
+const TASK_COL_CREATED_AT = 9;
+const TASK_COL_UPDATED_AT = 10;
+const TASK_COLUMN_COUNT = 11;
+
+// 日報シートの列インデックス（0始まり）
+const REPORT_COL_DATE = 0;
+const REPORT_COL_GOAL = 1;
+const REPORT_COL_ARRIVAL_HEALTH = 2;
+const REPORT_COL_DEPARTURE_HEALTH = 3;
+const REPORT_COL_COMPLETED_TASK_COUNT = 4;
+const REPORT_COL_COMPLETED_TASK_HOURS = 5;
+const REPORT_COL_REFLECTION = 6;
+const REPORT_COL_TOMORROW_PLAN = 7;
+const REPORT_COL_RECORDED_AT = 8;
+const REPORT_COLUMN_COUNT = 9;
+
 /**
  * スプレッドシートIDを取得
  * スクリプトプロパティから取得し、設定されていない場合はデフォルト値を使用
@@ -108,7 +134,7 @@ function initializeSpreadsheet() {
   
   // タスクシートの作成
   let tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
-  const expectedTaskHeaders = [
+  const TASK_HEADERS = [
     'ID', 'タイトル', '説明', '見積もり時間（時間）', '優先度', 
     '重要度', '提出先', '締切日', 'ステータス', '作成日時', '更新日時'
   ];
@@ -116,8 +142,8 @@ function initializeSpreadsheet() {
   if (!tasksSheet) {
     // 新規作成
     tasksSheet = ss.insertSheet(SHEET_NAME_TASKS);
-    const headerRange = tasksSheet.getRange(1, 1, 1, expectedTaskHeaders.length);
-    headerRange.setValues([expectedTaskHeaders]);
+    const headerRange = tasksSheet.getRange(1, 1, 1, TASK_COLUMN_COUNT);
+    headerRange.setValues([TASK_HEADERS]);
     headerRange.setFontWeight('bold');
     tasksSheet.setFrozenRows(1);
   } else {
@@ -126,17 +152,17 @@ function initializeSpreadsheet() {
     const headers = tasksSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
     
     // ヘッダーが一致しない場合は更新
-    if (lastColumn !== expectedTaskHeaders.length || 
-        !expectedTaskHeaders.every((header, idx) => headers[idx] === header)) {
-      const headerRange = tasksSheet.getRange(1, 1, 1, expectedTaskHeaders.length);
-      headerRange.setValues([expectedTaskHeaders]);
+    if (lastColumn !== TASK_COLUMN_COUNT || 
+        !TASK_HEADERS.every((header, idx) => headers[idx] === header)) {
+      const headerRange = tasksSheet.getRange(1, 1, 1, TASK_COLUMN_COUNT);
+      headerRange.setValues([TASK_HEADERS]);
       headerRange.setFontWeight('bold');
     }
   }
   
   // 日報シートの作成
   let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
-  const expectedReportHeaders = [
+  const REPORT_HEADERS = [
     '日付', '目標', '出社時体調', '退社時体調', 
     '完了タスク数合計', '完了タスク時間合計', '振り返り', '明日の予定', '記録日時'
   ];
@@ -144,8 +170,8 @@ function initializeSpreadsheet() {
   if (!reportSheet) {
     // 新規作成
     reportSheet = ss.insertSheet(SHEET_NAME_REPORT);
-    const headerRange = reportSheet.getRange(1, 1, 1, expectedReportHeaders.length);
-    headerRange.setValues([expectedReportHeaders]);
+    const headerRange = reportSheet.getRange(1, 1, 1, REPORT_COLUMN_COUNT);
+    headerRange.setValues([REPORT_HEADERS]);
     headerRange.setFontWeight('bold');
     reportSheet.setFrozenRows(1);
   } else {
@@ -154,10 +180,10 @@ function initializeSpreadsheet() {
     const headers = reportSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
     
     // ヘッダーが一致しない場合は更新
-    if (lastColumn !== expectedReportHeaders.length || 
-        !expectedReportHeaders.every((header, idx) => headers[idx] === header)) {
-      const headerRange = reportSheet.getRange(1, 1, 1, expectedReportHeaders.length);
-      headerRange.setValues([expectedReportHeaders]);
+    if (lastColumn !== REPORT_COLUMN_COUNT || 
+        !REPORT_HEADERS.every((header, idx) => headers[idx] === header)) {
+      const headerRange = reportSheet.getRange(1, 1, 1, REPORT_COLUMN_COUNT);
+      headerRange.setValues([REPORT_HEADERS]);
       headerRange.setFontWeight('bold');
     }
   }
@@ -229,26 +255,22 @@ function getTasks() {
     }
     
     const tasks = [];
-    const columnCount = data.length > 0 ? data[0].length : 0;
     
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      if (row[0]) { // IDが存在する場合のみ
-        // 列数に応じて後方互換性を保つ
-        const isOldFormat = columnCount < 11; // 11列未満は旧形式
-        
+      if (row[TASK_COL_ID]) { // IDが存在する場合のみ
         tasks.push({
-          id: row[0],
-          title: row[1] || '',
-          description: row[2] || '',
-          estimatedHours: row[3] || 0,
-          priority: row[4] || '中',
-          importance: isOldFormat && columnCount < 6 ? '中' : (row[5] || '中'), // 重要度
-          deliverable: isOldFormat && columnCount < 7 ? '' : (row[6] || ''), // 提出先
-          deadline: isOldFormat && columnCount < 8 ? '' : (row[7] || ''), // 締切日
-          status: isOldFormat && columnCount < 8 ? (row[5] || '未着手') : (row[8] || '未着手'), // ステータス
-          createdAt: isOldFormat && columnCount < 8 ? (row[6] || '') : (row[9] || ''), // 作成日時
-          updatedAt: isOldFormat && columnCount < 8 ? (row[7] || '') : (row[10] || '') // 更新日時
+          id: row[TASK_COL_ID],
+          title: row[TASK_COL_TITLE] || '',
+          description: row[TASK_COL_DESCRIPTION] || '',
+          estimatedHours: row[TASK_COL_ESTIMATED_HOURS] || 0,
+          priority: row[TASK_COL_PRIORITY] || '中',
+          importance: row[TASK_COL_IMPORTANCE] || '中',
+          deliverable: row[TASK_COL_DELIVERABLE] || '',
+          deadline: row[TASK_COL_DEADLINE] || '',
+          status: row[TASK_COL_STATUS] || '未着手',
+          createdAt: row[TASK_COL_CREATED_AT] || '',
+          updatedAt: row[TASK_COL_UPDATED_AT] || ''
         });
       }
     }
@@ -308,24 +330,23 @@ function addTask(taskData) {
     const data = tasksSheet.getDataRange().getValues();
     let newId = 1;
     if (data.length > 1) {
-      const ids = data.slice(1).map(row => parseInt(row[0]) || 0);
+      const ids = data.slice(1).map(row => parseInt(row[TASK_COL_ID]) || 0);
       newId = Math.max(...ids, 0) + 1;
     }
     
     const now = new Date();
-    const newRow = [
-      newId,
-      taskData.title || '',
-      taskData.description || '',
-      parseFloat(taskData.estimatedHours) || 0,
-      taskData.priority || '中',
-      taskData.importance || '中', // 重要度
-      taskData.deliverable || '', // 提出先
-      taskData.deadline || '', // 締切日
-      taskData.status || '未着手',
-      now.toISOString(),
-      now.toISOString()
-    ];
+    const newRow = new Array(TASK_COLUMN_COUNT);
+    newRow[TASK_COL_ID] = newId;
+    newRow[TASK_COL_TITLE] = taskData.title || '';
+    newRow[TASK_COL_DESCRIPTION] = taskData.description || '';
+    newRow[TASK_COL_ESTIMATED_HOURS] = parseFloat(taskData.estimatedHours) || 0;
+    newRow[TASK_COL_PRIORITY] = taskData.priority || '中';
+    newRow[TASK_COL_IMPORTANCE] = taskData.importance || '中';
+    newRow[TASK_COL_DELIVERABLE] = taskData.deliverable || '';
+    newRow[TASK_COL_DEADLINE] = taskData.deadline || '';
+    newRow[TASK_COL_STATUS] = taskData.status || '未着手';
+    newRow[TASK_COL_CREATED_AT] = now.toISOString();
+    newRow[TASK_COL_UPDATED_AT] = now.toISOString();
     
     tasksSheet.appendRow(newRow);
     
@@ -389,7 +410,7 @@ function updateTask(taskId, taskData) {
     
     // タスクIDで行を検索
     for (let i = 1; i < data.length; i++) {
-      if (parseInt(data[i][0]) === parseInt(taskId)) {
+      if (parseInt(data[i][TASK_COL_ID]) === parseInt(taskId)) {
         rowIndex = i + 1; // スプレッドシートの行番号は1から始まる
         break;
       }
@@ -407,34 +428,21 @@ function updateTask(taskId, taskData) {
     const now = new Date();
     
     // 更新するデータを準備（指定されていない場合は既存の値を使用）
-    // 後方互換性のため、列数に応じて処理
-    const lastColumn = tasksSheet.getLastColumn();
-    const isOldFormat = lastColumn < 11; // 11列未満は旧形式
+    const updatedRow = new Array(TASK_COLUMN_COUNT);
+    updatedRow[TASK_COL_ID] = existingRow[TASK_COL_ID]; // IDは変更しない
+    updatedRow[TASK_COL_TITLE] = taskData.title !== undefined ? taskData.title : existingRow[TASK_COL_TITLE];
+    updatedRow[TASK_COL_DESCRIPTION] = taskData.description !== undefined ? taskData.description : existingRow[TASK_COL_DESCRIPTION];
+    updatedRow[TASK_COL_ESTIMATED_HOURS] = taskData.estimatedHours !== undefined ? parseFloat(taskData.estimatedHours) : existingRow[TASK_COL_ESTIMATED_HOURS];
+    updatedRow[TASK_COL_PRIORITY] = taskData.priority !== undefined ? taskData.priority : existingRow[TASK_COL_PRIORITY];
+    updatedRow[TASK_COL_IMPORTANCE] = taskData.importance !== undefined ? taskData.importance : (existingRow[TASK_COL_IMPORTANCE] || '中');
+    updatedRow[TASK_COL_DELIVERABLE] = taskData.deliverable !== undefined ? taskData.deliverable : (existingRow[TASK_COL_DELIVERABLE] || '');
+    updatedRow[TASK_COL_DEADLINE] = taskData.deadline !== undefined ? taskData.deadline : (existingRow[TASK_COL_DEADLINE] || '');
+    updatedRow[TASK_COL_STATUS] = taskData.status !== undefined ? taskData.status : (existingRow[TASK_COL_STATUS] || '未着手');
+    updatedRow[TASK_COL_CREATED_AT] = existingRow[TASK_COL_CREATED_AT] || ''; // 作成日時は変更しない
+    updatedRow[TASK_COL_UPDATED_AT] = now.toISOString(); // 更新日時を更新
     
-    // 既存データから値を取得（旧形式の場合は適切な列から取得）
-    const getExistingValue = (newIndex, oldIndex) => {
-      if (isOldFormat && oldIndex !== undefined) {
-        return existingRow[oldIndex] || '';
-      }
-      return existingRow[newIndex] || '';
-    };
-    
-    const updatedRow = [
-      existingRow[0], // IDは変更しない
-      taskData.title !== undefined ? taskData.title : existingRow[1],
-      taskData.description !== undefined ? taskData.description : existingRow[2],
-      taskData.estimatedHours !== undefined ? parseFloat(taskData.estimatedHours) : existingRow[3],
-      taskData.priority !== undefined ? taskData.priority : existingRow[4],
-      taskData.importance !== undefined ? taskData.importance : (isOldFormat && lastColumn < 6 ? '中' : (existingRow[5] || '中')), // 重要度
-      taskData.deliverable !== undefined ? taskData.deliverable : (isOldFormat && lastColumn < 7 ? '' : (existingRow[6] || '')), // 提出先
-      taskData.deadline !== undefined ? taskData.deadline : (isOldFormat && lastColumn < 8 ? '' : (existingRow[7] || '')), // 締切日
-      taskData.status !== undefined ? taskData.status : (isOldFormat && lastColumn < 8 ? (existingRow[5] || '未着手') : (existingRow[8] || '未着手')), // ステータス
-      isOldFormat && lastColumn < 8 ? getExistingValue(9, 6) : (existingRow[9] || ''), // 作成日時は変更しない
-      now.toISOString() // 更新日時を更新
-    ];
-    
-    // 行を更新（11列で更新、不足している場合は自動的に拡張される）
-    tasksSheet.getRange(rowIndex, 1, 1, 11).setValues([updatedRow]);
+    // 行を更新
+    tasksSheet.getRange(rowIndex, 1, 1, TASK_COLUMN_COUNT).setValues([updatedRow]);
     
     return {
       success: true,
@@ -496,7 +504,7 @@ function deleteTask(taskId) {
     
     // タスクIDで行を検索
     for (let i = 1; i < data.length; i++) {
-      if (parseInt(data[i][0]) === parseInt(taskId)) {
+      if (parseInt(data[i][TASK_COL_ID]) === parseInt(taskId)) {
         rowIndex = i + 1; // スプレッドシートの行番号は1から始まる
         break;
       }
@@ -628,7 +636,7 @@ function recordHealthScore(healthData) {
       
       // 既存の行を検索
       for (let i = 1; i < data.length; i++) {
-        const rowDate = data[i][0];
+        const rowDate = data[i][REPORT_COL_DATE];
         let rowDateStr = '';
         
         if (rowDate instanceof Date) {
@@ -638,8 +646,8 @@ function recordHealthScore(healthData) {
         }
         
         if (rowDateStr === date) {
-          // 出社時体調を更新（3列目）
-          reportSheet.getRange(i + 1, 3).setValue(score);
+          // 出社時体調を更新
+          reportSheet.getRange(i + 1, REPORT_COL_ARRIVAL_HEALTH + 1).setValue(score);
           found = true;
           break;
         }
@@ -647,17 +655,16 @@ function recordHealthScore(healthData) {
       
       // 見つからない場合は新規追加
       if (!found) {
-        const newRow = [
-          date,
-          '', // 目標
-          score, // 出社時体調
-          '', // 退社時体調
-          0,  // 完了タスク数
-          0,  // 完了タスク時間合計
-          '', // 振り返り
-          '', // 明日の予定
-          new Date() // 記録日時
-        ];
+        const newRow = new Array(REPORT_COLUMN_COUNT);
+        newRow[REPORT_COL_DATE] = date;
+        newRow[REPORT_COL_GOAL] = '';
+        newRow[REPORT_COL_ARRIVAL_HEALTH] = score;
+        newRow[REPORT_COL_DEPARTURE_HEALTH] = '';
+        newRow[REPORT_COL_COMPLETED_TASK_COUNT] = 0;
+        newRow[REPORT_COL_COMPLETED_TASK_HOURS] = 0;
+        newRow[REPORT_COL_REFLECTION] = '';
+        newRow[REPORT_COL_TOMORROW_PLAN] = '';
+        newRow[REPORT_COL_RECORDED_AT] = new Date();
         reportSheet.appendRow(newRow);
       }
     }
@@ -768,19 +775,19 @@ function saveDailyGoal(date, goal) {
     const data = reportSheet.getDataRange().getValues();
     let found = false;
     
-    // 既存の行を検索（日付列は1列目、インデックス0）
+    // 既存の行を検索
     for (let i = 1; i < data.length; i++) {
-      const rowDate = data[i][0];
+      const rowDate = data[i][REPORT_COL_DATE];
       if (rowDate instanceof Date) {
         const rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
         if (rowDateStr === date) {
-          // 既存の行を更新（目標列は2列目、インデックス1）
-          reportSheet.getRange(i + 1, 2).setValue(goal);
+          // 既存の行を更新
+          reportSheet.getRange(i + 1, REPORT_COL_GOAL + 1).setValue(goal);
           found = true;
           break;
         }
       } else if (rowDate === date) {
-        reportSheet.getRange(i + 1, 2).setValue(goal);
+        reportSheet.getRange(i + 1, REPORT_COL_GOAL + 1).setValue(goal);
         found = true;
         break;
       }
@@ -788,16 +795,16 @@ function saveDailyGoal(date, goal) {
     
     // 見つからない場合は新規追加
     if (!found) {
-      const newRow = [
-        date,
-        goal,
-        '', // 体調スコア
-        0,  // 完了タスク数
-        0,  // 完了タスク時間合計
-        '', // 振り返り
-        '', // 明日の予定
-        new Date() // 記録日時
-      ];
+      const newRow = new Array(REPORT_COLUMN_COUNT);
+      newRow[REPORT_COL_DATE] = date;
+      newRow[REPORT_COL_GOAL] = goal;
+      newRow[REPORT_COL_ARRIVAL_HEALTH] = '';
+      newRow[REPORT_COL_DEPARTURE_HEALTH] = '';
+      newRow[REPORT_COL_COMPLETED_TASK_COUNT] = 0;
+      newRow[REPORT_COL_COMPLETED_TASK_HOURS] = 0;
+      newRow[REPORT_COL_REFLECTION] = '';
+      newRow[REPORT_COL_TOMORROW_PLAN] = '';
+      newRow[REPORT_COL_RECORDED_AT] = new Date();
       reportSheet.appendRow(newRow);
     }
     
@@ -831,14 +838,14 @@ function getDailyGoal(date) {
     
     // 日付に一致する行を検索
     for (let i = 1; i < data.length; i++) {
-      const rowDate = data[i][0];
+      const rowDate = data[i][REPORT_COL_DATE];
       if (rowDate instanceof Date) {
         const rowDateStr = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
         if (rowDateStr === date) {
-          return data[i][1] || ''; // 目標列（2列目、インデックス1）
+          return data[i][REPORT_COL_GOAL] || '';
         }
       } else if (rowDate === date) {
-        return data[i][1] || '';
+        return data[i][REPORT_COL_GOAL] || '';
       }
     }
     
@@ -933,48 +940,6 @@ function recordDailyReport(reportData) {
           message: '日報シートが見つかりません。初期化を実行してください。'
         };
       }
-    } else {
-      // 既存のシートがある場合、列構成を確認して必要に応じて更新
-      const lastColumn = reportSheet.getLastColumn();
-      const headers = reportSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
-      
-      // 古い形式（8列で「体調スコア」が3列目）の場合は列を更新
-      if (lastColumn === 8 && headers[2] === '体調スコア') {
-        // 3列目（体調スコア）の後に列を挿入
-        reportSheet.insertColumnAfter(3);
-        
-        // ヘッダーを更新
-        reportSheet.getRange(1, 3).setValue('出社時体調');
-        reportSheet.getRange(1, 4).setValue('退社時体調');
-        
-        // 既存の体調スコアデータを出社時体調に移動
-        const lastRow = reportSheet.getLastRow();
-        if (lastRow > 1) {
-          // 3列目（旧体調スコア）のデータを取得
-          const oldHealthData = reportSheet.getRange(2, 3, lastRow - 1, 1).getValues();
-          // 出社時体調（3列目）に既存データを設定
-          reportSheet.getRange(2, 3, lastRow - 1, 1).setValues(oldHealthData);
-          // 退社時体調（4列目）は空にする
-          reportSheet.getRange(2, 4, lastRow - 1, 1).setValue('');
-          
-          // 以降の列を1つ右にシフト
-          // 完了タスク数（4→5列目）
-          const taskCountData = reportSheet.getRange(2, 4, lastRow - 1, 1).getValues();
-          reportSheet.getRange(2, 5, lastRow - 1, 1).setValues(taskCountData);
-          // 完了タスク時間合計（5→6列目）
-          const taskHoursData = reportSheet.getRange(2, 5, lastRow - 1, 1).getValues();
-          reportSheet.getRange(2, 6, lastRow - 1, 1).setValues(taskHoursData);
-          // 振り返り（6→7列目）
-          const reflectionData = reportSheet.getRange(2, 6, lastRow - 1, 1).getValues();
-          reportSheet.getRange(2, 7, lastRow - 1, 1).setValues(reflectionData);
-          // 明日の予定（7→8列目）
-          const tomorrowPlanData = reportSheet.getRange(2, 7, lastRow - 1, 1).getValues();
-          reportSheet.getRange(2, 8, lastRow - 1, 1).setValues(tomorrowPlanData);
-          // 記録日時（8→9列目）
-          const recordDateData = reportSheet.getRange(2, 8, lastRow - 1, 1).getValues();
-          reportSheet.getRange(2, 9, lastRow - 1, 1).setValues(recordDateData);
-        }
-      }
     }
     
     // 今日完了したタスクを取得
@@ -983,9 +948,9 @@ function recordDailyReport(reportData) {
     const data = reportSheet.getDataRange().getValues();
     let found = false;
     
-    // 既存の行を検索（日付列は1列目、インデックス0）
+    // 既存の行を検索
     for (let i = 1; i < data.length; i++) {
-      const rowDate = data[i][0];
+      const rowDate = data[i][REPORT_COL_DATE];
       let rowDateStr = '';
       
       if (rowDate instanceof Date) {
@@ -996,15 +961,14 @@ function recordDailyReport(reportData) {
       
       if (rowDateStr === reportData.date) {
         // 既存の行を更新
-        reportSheet.getRange(i + 1, 2).setValue(reportData.goal || ''); // 目標
+        reportSheet.getRange(i + 1, REPORT_COL_GOAL + 1).setValue(reportData.goal || '');
         // 出社時体調は既存の値を保持（更新しない）
-        // reportSheet.getRange(i + 1, 3).setValue(reportData.arrivalHealthScore || ''); // 出社時体調
-        reportSheet.getRange(i + 1, 4).setValue(reportData.healthScore || ''); // 退社時体調
-        reportSheet.getRange(i + 1, 5).setValue(completedTasks.count || 0); // 完了タスク数
-        reportSheet.getRange(i + 1, 6).setValue(completedTasks.totalHours || 0); // 完了タスク時間合計
-        reportSheet.getRange(i + 1, 7).setValue(reportData.reflection || ''); // 振り返り
-        reportSheet.getRange(i + 1, 8).setValue(reportData.tomorrowPlan || ''); // 明日の予定
-        reportSheet.getRange(i + 1, 9).setValue(new Date()); // 記録日時
+        reportSheet.getRange(i + 1, REPORT_COL_DEPARTURE_HEALTH + 1).setValue(reportData.healthScore || '');
+        reportSheet.getRange(i + 1, REPORT_COL_COMPLETED_TASK_COUNT + 1).setValue(completedTasks.count || 0);
+        reportSheet.getRange(i + 1, REPORT_COL_COMPLETED_TASK_HOURS + 1).setValue(completedTasks.totalHours || 0);
+        reportSheet.getRange(i + 1, REPORT_COL_REFLECTION + 1).setValue(reportData.reflection || '');
+        reportSheet.getRange(i + 1, REPORT_COL_TOMORROW_PLAN + 1).setValue(reportData.tomorrowPlan || '');
+        reportSheet.getRange(i + 1, REPORT_COL_RECORDED_AT + 1).setValue(new Date());
         found = true;
         break;
       }
@@ -1012,17 +976,16 @@ function recordDailyReport(reportData) {
     
     // 見つからない場合は新規追加
     if (!found) {
-      const newRow = [
-        reportData.date,
-        reportData.goal || '',
-        reportData.arrivalHealthScore || '', // 出社時体調
-        reportData.healthScore || '', // 退社時体調
-        completedTasks.count || 0,
-        completedTasks.totalHours || 0,
-        reportData.reflection || '',
-        reportData.tomorrowPlan || '',
-        new Date() // 記録日時
-      ];
+      const newRow = new Array(REPORT_COLUMN_COUNT);
+      newRow[REPORT_COL_DATE] = reportData.date;
+      newRow[REPORT_COL_GOAL] = reportData.goal || '';
+      newRow[REPORT_COL_ARRIVAL_HEALTH] = reportData.arrivalHealthScore || '';
+      newRow[REPORT_COL_DEPARTURE_HEALTH] = reportData.healthScore || '';
+      newRow[REPORT_COL_COMPLETED_TASK_COUNT] = completedTasks.count || 0;
+      newRow[REPORT_COL_COMPLETED_TASK_HOURS] = completedTasks.totalHours || 0;
+      newRow[REPORT_COL_REFLECTION] = reportData.reflection || '';
+      newRow[REPORT_COL_TOMORROW_PLAN] = reportData.tomorrowPlan || '';
+      newRow[REPORT_COL_RECORDED_AT] = new Date();
       reportSheet.appendRow(newRow);
     }
     
@@ -1066,7 +1029,7 @@ function getDailyReport(date) {
     
     // 日付に一致する行を検索
     for (let i = 1; i < data.length; i++) {
-      const rowDate = data[i][0];
+      const rowDate = data[i][REPORT_COL_DATE];
       let rowDateStr = '';
       
       if (rowDate instanceof Date) {
@@ -1076,17 +1039,16 @@ function getDailyReport(date) {
       }
       
       if (rowDateStr === date) {
-        // 列の順序: 日付(0), 目標(1), 出社時体調(2), 退社時体調(3), 完了タスク数合計(4), 完了タスク時間合計(5), 振り返り(6), 明日の予定(7), 記録日時(8)
         return {
           error: false,
           date: date,
-          goal: data[i][1] || '',
-          arrivalHealthScore: data[i][2] || '', // 出社時体調
-          healthScore: data[i][3] || '', // 退社時体調（後方互換性のためhealthScoreも保持）
-          completedTaskCount: data[i][4] || 0, // 完了タスク数合計
-          completedTaskHours: data[i][5] || 0, // 完了タスク時間合計
-          reflection: data[i][6] || '', // 振り返り
-          tomorrowPlan: data[i][7] || '' // 明日の予定
+          goal: data[i][REPORT_COL_GOAL] || '',
+          arrivalHealthScore: data[i][REPORT_COL_ARRIVAL_HEALTH] || '',
+          healthScore: data[i][REPORT_COL_DEPARTURE_HEALTH] || '',
+          completedTaskCount: data[i][REPORT_COL_COMPLETED_TASK_COUNT] || 0,
+          completedTaskHours: data[i][REPORT_COL_COMPLETED_TASK_HOURS] || 0,
+          reflection: data[i][REPORT_COL_REFLECTION] || '',
+          tomorrowPlan: data[i][REPORT_COL_TOMORROW_PLAN] || ''
         };
       }
     }
