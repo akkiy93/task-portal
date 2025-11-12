@@ -142,9 +142,13 @@ function initializeSpreadsheet() {
       }
       
       // 既存データの列をシフト（ステータス以降を右に移動）
+      // 重要度列を追加した後、提出先列を追加する際に列をシフト
       const lastRow = tasksSheet.getLastRow();
-      if (lastRow > 1) {
-        // ステータス（7→8列目）
+      if (lastRow > 1 && lastColumn < 7) {
+        // 既存の8列構造（ID, タイトル, 説明, 見積もり時間, 優先度, ステータス, 作成日時, 更新日時）
+        // を10列構造（ID, タイトル, 説明, 見積もり時間, 優先度, 重要度, 提出先, ステータス, 作成日時, 更新日時）に変換
+        
+        // ステータス（6→8列目）
         if (lastColumn >= 6) {
           const statusData = tasksSheet.getRange(2, 6, lastRow - 1, 1).getValues();
           tasksSheet.getRange(2, 8, lastRow - 1, 1).setValues(statusData);
@@ -307,20 +311,25 @@ function getTasks() {
     }
     
     const tasks = [];
+    const columnCount = data.length > 0 ? data[0].length : 0;
+    
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if (row[0]) { // IDが存在する場合のみ
+        // 列数に応じて後方互換性を保つ
+        const isOldFormat = columnCount < 10; // 10列未満は旧形式
+        
         tasks.push({
           id: row[0],
           title: row[1] || '',
           description: row[2] || '',
           estimatedHours: row[3] || 0,
           priority: row[4] || '中',
-          importance: row[5] || '中', // 重要度（既存データは空の可能性がある）
-          deliverable: row[6] || '', // 提出先（既存データは空の可能性がある）
-          status: row[7] || row[5] || '未着手', // 後方互換性のため
-          createdAt: row[8] || row[6] || '', // 後方互換性のため
-          updatedAt: row[9] || row[7] || '' // 後方互換性のため
+          importance: isOldFormat ? '中' : (row[5] || '中'), // 重要度（旧形式の場合はデフォルト値）
+          deliverable: isOldFormat ? '' : (row[6] || ''), // 提出先（旧形式の場合は空）
+          status: isOldFormat ? (row[5] || '未着手') : (row[7] || '未着手'), // ステータス
+          createdAt: isOldFormat ? (row[6] || '') : (row[8] || ''), // 作成日時
+          updatedAt: isOldFormat ? (row[7] || '') : (row[9] || '') // 更新日時
         });
       }
     }
@@ -480,20 +489,30 @@ function updateTask(taskId, taskData) {
     // 更新するデータを準備（指定されていない場合は既存の値を使用）
     // 後方互換性のため、列数に応じて処理
     const lastColumn = tasksSheet.getLastColumn();
+    const isOldFormat = lastColumn < 10; // 10列未満は旧形式
+    
+    // 既存データから値を取得（旧形式の場合は適切な列から取得）
+    const getExistingValue = (newIndex, oldIndex) => {
+      if (isOldFormat && oldIndex !== undefined) {
+        return existingRow[oldIndex] || '';
+      }
+      return existingRow[newIndex] || '';
+    };
+    
     const updatedRow = [
       existingRow[0], // IDは変更しない
       taskData.title !== undefined ? taskData.title : existingRow[1],
       taskData.description !== undefined ? taskData.description : existingRow[2],
       taskData.estimatedHours !== undefined ? parseFloat(taskData.estimatedHours) : existingRow[3],
       taskData.priority !== undefined ? taskData.priority : existingRow[4],
-      taskData.importance !== undefined ? taskData.importance : (existingRow[5] || '中'), // 重要度
-      taskData.deliverable !== undefined ? taskData.deliverable : (existingRow[6] || ''), // 提出先
-      taskData.status !== undefined ? taskData.status : (existingRow[7] || existingRow[5] || '未着手'), // ステータス（後方互換性）
-      existingRow[8] || existingRow[6] || '', // 作成日時は変更しない（後方互換性）
+      taskData.importance !== undefined ? taskData.importance : (isOldFormat ? '中' : (existingRow[5] || '中')), // 重要度
+      taskData.deliverable !== undefined ? taskData.deliverable : (isOldFormat ? '' : (existingRow[6] || '')), // 提出先
+      taskData.status !== undefined ? taskData.status : (isOldFormat ? (existingRow[5] || '未着手') : (existingRow[7] || '未着手')), // ステータス
+      isOldFormat ? getExistingValue(8, 6) : existingRow[8] || '', // 作成日時は変更しない
       now.toISOString() // 更新日時を更新
     ];
     
-    // 行を更新（10列で更新）
+    // 行を更新（10列で更新、不足している場合は自動的に拡張される）
     tasksSheet.getRange(rowIndex, 1, 1, 10).setValues([updatedRow]);
     
     return {
