@@ -108,170 +108,163 @@ function initializeSpreadsheet() {
   
   // タスクシートの作成
   let tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
+  const expectedTaskHeaders = [
+    'ID', 'タイトル', '説明', '見積もり時間（時間）', '優先度', 
+    '重要度', '提出先', '締切日', 'ステータス', '作成日時', '更新日時'
+  ];
+  
   if (!tasksSheet) {
+    // 新規作成
     tasksSheet = ss.insertSheet(SHEET_NAME_TASKS);
-    // ヘッダー行を設定（重要度、提出先、締切日を追加）
-    tasksSheet.getRange(1, 1, 1, 11).setValues([[
-      'ID', 'タイトル', '説明', '見積もり時間（時間）', '優先度', '重要度', '提出先', '締切日', 'ステータス', '作成日時', '更新日時'
-    ]]);
-    tasksSheet.getRange(1, 1, 1, 11).setFontWeight('bold');
+    const headerRange = tasksSheet.getRange(1, 1, 1, expectedTaskHeaders.length);
+    headerRange.setValues([expectedTaskHeaders]);
+    headerRange.setFontWeight('bold');
     tasksSheet.setFrozenRows(1);
   } else {
-    // 既存のシートがある場合、列数を確認して必要に応じて更新
+    // 既存シートの列構造を更新
     const lastColumn = tasksSheet.getLastColumn();
     const headers = tasksSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+    const lastRow = tasksSheet.getLastRow();
+    let needsDataShift = false;
     
-    // 重要度列（6列目）が存在しない場合は追加
-    if (lastColumn < 6 || headers[5] !== '重要度') {
-      if (lastColumn < 6) {
-        // 列が足りない場合は列を追加
-        tasksSheet.insertColumnAfter(5);
-        tasksSheet.getRange(1, 6).setValue('重要度');
-      } else {
-        tasksSheet.getRange(1, 6).setValue('重要度');
+    // 必要な列を順番に追加
+    const columnsToAdd = [
+      { index: 6, name: '重要度', insertAfter: 5 },
+      { index: 7, name: '提出先', insertAfter: 6 },
+      { index: 8, name: '締切日', insertAfter: 7 }
+    ];
+    
+    for (const col of columnsToAdd) {
+      if (lastColumn < col.index || headers[col.index - 1] !== col.name) {
+        if (lastColumn < col.index) {
+          tasksSheet.insertColumnAfter(col.insertAfter);
+          needsDataShift = true;
+        }
+        tasksSheet.getRange(1, col.index).setValue(col.name);
       }
     }
     
-    // 提出先列（7列目）が存在しない場合は追加
-    if (lastColumn < 7 || headers[6] !== '提出先') {
-      if (lastColumn < 7) {
-        tasksSheet.insertColumnAfter(6);
-        tasksSheet.getRange(1, 7).setValue('提出先');
-      } else {
-        tasksSheet.getRange(1, 7).setValue('提出先');
+    // データシフトが必要な場合（旧形式から新形式への移行）
+    if (needsDataShift && lastRow > 1) {
+      const dataRange = tasksSheet.getRange(2, 1, lastRow - 1, lastColumn);
+      const allData = dataRange.getValues();
+      
+      // 列マッピング: [旧列インデックス] => 新列インデックス
+      const columnMapping = [];
+      for (let i = 0; i < expectedTaskHeaders.length; i++) {
+        columnMapping[i] = i + 1; // デフォルトは同じ位置
       }
       
-      // 既存データの列をシフト（ステータス以降を右に移動）
-      // 重要度列を追加した後、提出先列を追加する際に列をシフト
-      const lastRow = tasksSheet.getLastRow();
-      if (lastRow > 1 && lastColumn < 7) {
-        // 既存の8列構造（ID, タイトル, 説明, 見積もり時間, 優先度, ステータス, 作成日時, 更新日時）
-        // を10列構造（ID, タイトル, 説明, 見積もり時間, 優先度, 重要度, 提出先, ステータス, 作成日時, 更新日時）に変換
-        
-        // ステータス（6→8列目）
-        if (lastColumn >= 6) {
-          const statusData = tasksSheet.getRange(2, 6, lastRow - 1, 1).getValues();
-          tasksSheet.getRange(2, 8, lastRow - 1, 1).setValues(statusData);
-        }
-        // 作成日時（7→9列目）
-        if (lastColumn >= 7) {
-          const createdAtData = tasksSheet.getRange(2, 7, lastRow - 1, 1).getValues();
-          tasksSheet.getRange(2, 9, lastRow - 1, 1).setValues(createdAtData);
-        }
-        // 更新日時（8→10列目）
-        if (lastColumn >= 8) {
-          const updatedAtData = tasksSheet.getRange(2, 8, lastRow - 1, 1).getValues();
-          tasksSheet.getRange(2, 10, lastRow - 1, 1).setValues(updatedAtData);
-        }
-      }
-    }
-    
-    // 締切日列（8列目）が存在しない場合は追加
-    if (lastColumn < 8 || headers[7] !== '締切日') {
+      // 旧形式（8列）から新形式（11列）へのマッピング
       if (lastColumn < 8) {
-        tasksSheet.insertColumnAfter(7);
-        tasksSheet.getRange(1, 8).setValue('締切日');
-      } else {
-        tasksSheet.getRange(1, 8).setValue('締切日');
+        // 旧: ID(1), タイトル(2), 説明(3), 時間(4), 優先度(5), ステータス(6), 作成日時(7), 更新日時(8)
+        // 新: ID(1), タイトル(2), 説明(3), 時間(4), 優先度(5), 重要度(6), 提出先(7), 締切日(8), ステータス(9), 作成日時(10), 更新日時(11)
+        const oldToNew = { 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 8, 6: 9, 7: 10 }; // ステータス以降をシフト
+        for (let oldIdx = 0; oldIdx < allData[0].length; oldIdx++) {
+          if (oldToNew[oldIdx] !== undefined) {
+            columnMapping[oldIdx] = oldToNew[oldIdx] + 1;
+          }
+        }
+      } else if (lastColumn === 10) {
+        // 10列形式（重要度・提出先あり、締切日なし）から11列形式への移行
+        const oldToNew = { 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 8, 8: 9, 9: 10 }; // ステータス以降をシフト
+        for (let oldIdx = 0; oldIdx < allData[0].length; oldIdx++) {
+          if (oldToNew[oldIdx] !== undefined) {
+            columnMapping[oldIdx] = oldToNew[oldIdx] + 1;
+          }
+        }
       }
       
-      // 既存データの列をシフト（ステータス以降を右に移動）
-      const lastRow = tasksSheet.getLastRow();
-      if (lastRow > 1 && lastColumn < 8) {
-        // 既存の10列構造（ID, タイトル, 説明, 見積もり時間, 優先度, 重要度, 提出先, ステータス, 作成日時, 更新日時）
-        // を11列構造（ID, タイトル, 説明, 見積もり時間, 優先度, 重要度, 提出先, 締切日, ステータス, 作成日時, 更新日時）に変換
-        
-        // ステータス（7→9列目）
-        if (lastColumn >= 7) {
-          const statusData = tasksSheet.getRange(2, 7, lastRow - 1, 1).getValues();
-          tasksSheet.getRange(2, 9, lastRow - 1, 1).setValues(statusData);
+      // データを新しい位置にコピー
+      const newData = [];
+      for (let rowIdx = 0; rowIdx < allData.length; rowIdx++) {
+        const newRow = new Array(expectedTaskHeaders.length).fill('');
+        for (let oldColIdx = 0; oldColIdx < allData[rowIdx].length; oldColIdx++) {
+          const newColIdx = columnMapping[oldColIdx] - 1;
+          if (newColIdx >= 0 && newColIdx < expectedTaskHeaders.length) {
+            newRow[newColIdx] = allData[rowIdx][oldColIdx];
+          }
         }
-        // 作成日時（8→10列目）
-        if (lastColumn >= 8) {
-          const createdAtData = tasksSheet.getRange(2, 8, lastRow - 1, 1).getValues();
-          tasksSheet.getRange(2, 10, lastRow - 1, 1).setValues(createdAtData);
-        }
-        // 更新日時（9→11列目）
-        if (lastColumn >= 9) {
-          const updatedAtData = tasksSheet.getRange(2, 9, lastRow - 1, 1).getValues();
-          tasksSheet.getRange(2, 11, lastRow - 1, 1).setValues(updatedAtData);
-        }
+        newData.push(newRow);
       }
+      
+      // 一括でデータを更新
+      tasksSheet.getRange(2, 1, newData.length, expectedTaskHeaders.length).setValues(newData);
     }
   }
   
   // 日報シートの作成
   let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+  const expectedReportHeaders = [
+    '日付', '目標', '出社時体調', '退社時体調', 
+    '完了タスク数合計', '完了タスク時間合計', '振り返り', '明日の予定', '記録日時'
+  ];
+  
   if (!reportSheet) {
+    // 新規作成
     reportSheet = ss.insertSheet(SHEET_NAME_REPORT);
-    // ヘッダー行を設定
-    reportSheet.getRange(1, 1, 1, 9).setValues([[
-      '日付', '目標', '出社時体調', '退社時体調', '完了タスク数合計', '完了タスク時間合計', '振り返り', '明日の予定', '記録日時'
-    ]]);
-    reportSheet.getRange(1, 1, 1, 9).setFontWeight('bold');
+    const headerRange = reportSheet.getRange(1, 1, 1, expectedReportHeaders.length);
+    headerRange.setValues([expectedReportHeaders]);
+    headerRange.setFontWeight('bold');
     reportSheet.setFrozenRows(1);
   } else {
-    // 既存のシートがある場合、列数を確認して必要に応じて更新
+    // 既存シートの列構造を更新
     const lastColumn = reportSheet.getLastColumn();
     const headers = reportSheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+    const lastRow = reportSheet.getLastRow();
     
     // 古い形式（8列で「体調スコア」が3列目）の場合は列を更新
     if (lastColumn === 8 && headers[2] === '体調スコア') {
-      // 3列目（体調スコア）の後に列を挿入
       reportSheet.insertColumnAfter(3);
       
-      // ヘッダーを更新
-      reportSheet.getRange(1, 3).setValue('出社時体調');
-      reportSheet.getRange(1, 4).setValue('退社時体調');
+      // ヘッダーを一括更新
+      const headerUpdates = [
+        { row: 1, col: 3, value: '出社時体調' },
+        { row: 1, col: 4, value: '退社時体調' }
+      ];
+      for (const update of headerUpdates) {
+        reportSheet.getRange(update.row, update.col).setValue(update.value);
+      }
       
-      // 既存の体調スコアデータを出社時体調に移動
-      const lastRow = reportSheet.getLastRow();
+      // データの移行（バッチ処理）
       if (lastRow > 1) {
-        // 3列目（旧体調スコア）のデータを取得
-        const oldHealthData = reportSheet.getRange(2, 3, lastRow - 1, 1).getValues();
-        // 出社時体調（3列目）に既存データを設定
-        reportSheet.getRange(2, 3, lastRow - 1, 1).setValues(oldHealthData);
-        // 退社時体調（4列目）は空にする
-        reportSheet.getRange(2, 4, lastRow - 1, 1).setValue('');
+        const dataRange = reportSheet.getRange(2, 1, lastRow - 1, lastColumn);
+        const allData = dataRange.getValues();
         
-        // 以降の列を1つ右にシフト
-        // 完了タスク数合計（4→5列目）
-        if (lastRow > 1) {
-          const taskCountData = reportSheet.getRange(2, 4, lastRow - 1, 1).getValues();
-          reportSheet.getRange(2, 5, lastRow - 1, 1).setValues(taskCountData);
+        // 列マッピング: 旧形式から新形式へ
+        // 旧: 日付(1), 目標(2), 体調スコア(3), 完了タスク数(4), 完了タスク時間(5), 振り返り(6), 明日の予定(7), 記録日時(8)
+        // 新: 日付(1), 目標(2), 出社時体調(3), 退社時体調(4), 完了タスク数(5), 完了タスク時間(6), 振り返り(7), 明日の予定(8), 記録日時(9)
+        const newData = [];
+        for (let rowIdx = 0; rowIdx < allData.length; rowIdx++) {
+          const newRow = [
+            allData[rowIdx][0], // 日付
+            allData[rowIdx][1], // 目標
+            allData[rowIdx][2], // 出社時体調（旧体調スコア）
+            '', // 退社時体調（空）
+            allData[rowIdx][3], // 完了タスク数
+            allData[rowIdx][4], // 完了タスク時間
+            allData[rowIdx][5], // 振り返り
+            allData[rowIdx][6], // 明日の予定
+            allData[rowIdx][7]  // 記録日時
+          ];
+          newData.push(newRow);
         }
-        // 完了タスク時間合計（5→6列目）
-        if (lastRow > 1) {
-          const taskHoursData = reportSheet.getRange(2, 5, lastRow - 1, 1).getValues();
-          reportSheet.getRange(2, 6, lastRow - 1, 1).setValues(taskHoursData);
-        }
-        // 振り返り（6→7列目）
-        if (lastRow > 1) {
-          const reflectionData = reportSheet.getRange(2, 6, lastRow - 1, 1).getValues();
-          reportSheet.getRange(2, 7, lastRow - 1, 1).setValues(reflectionData);
-        }
-        // 明日の予定（7→8列目）
-        if (lastRow > 1) {
-          const tomorrowPlanData = reportSheet.getRange(2, 7, lastRow - 1, 1).getValues();
-          reportSheet.getRange(2, 8, lastRow - 1, 1).setValues(tomorrowPlanData);
-        }
-        // 記録日時（8→9列目）
-        if (lastRow > 1) {
-          const recordDateData = reportSheet.getRange(2, 8, lastRow - 1, 1).getValues();
-          reportSheet.getRange(2, 9, lastRow - 1, 1).setValues(recordDateData);
-        }
+        
+        // 一括でデータを更新
+        reportSheet.getRange(2, 1, newData.length, expectedReportHeaders.length).setValues(newData);
       }
     } else if (lastColumn < 9 || headers[2] !== '出社時体調' || headers[3] !== '退社時体調') {
-      // その他の古い形式の場合も対応
-      // ヘッダーを直接更新
+      // その他の古い形式の場合
+      if (lastColumn < 4) {
+        if (lastColumn === 3) {
+          reportSheet.insertColumnAfter(3);
+        }
+      }
+      // ヘッダーを更新
       if (lastColumn >= 3) {
         reportSheet.getRange(1, 3).setValue('出社時体調');
       }
       if (lastColumn >= 4) {
-        reportSheet.getRange(1, 4).setValue('退社時体調');
-      } else if (lastColumn === 3) {
-        // 3列しかない場合は列を追加
-        reportSheet.insertColumnAfter(3);
         reportSheet.getRange(1, 4).setValue('退社時体調');
       }
     }
