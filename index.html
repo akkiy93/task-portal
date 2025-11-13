@@ -1928,10 +1928,68 @@
       // タスクデータを取得
       callGasWithLoading(buttonElement, function(enableButton) {
         const gasCall = google.script.run
-          .withSuccessHandler(function(tasks) {
+          .withSuccessHandler(function(result) {
             enableButton(); // 処理完了後に再有効化
-            if (tasks.error) {
-              alert('エラー: ' + tasks.message);
+            
+            // JSON文字列の場合
+            let parsedResult = null;
+            if (typeof result === 'string') {
+              try {
+                parsedResult = JSON.parse(result);
+              } catch (parseError) {
+                console.error('editTask: JSONパースエラー:', parseError);
+                alert('データの解析に失敗しました');
+                return;
+              }
+            } 
+            // オブジェクトの場合
+            else if (result && typeof result === 'object' && !Array.isArray(result)) {
+              parsedResult = result;
+            }
+            // 配列で直接返されている場合（後方互換性）
+            else if (Array.isArray(result)) {
+              parsedResult = { success: true, tasks: result };
+            }
+            // その他の場合
+            else {
+              console.warn('editTask: 予期しない形式:', result);
+              alert('データの形式が正しくありません');
+              return;
+            }
+            
+            // エラーチェック
+            if (parsedResult.error) {
+              alert('エラー: ' + parsedResult.message);
+              return;
+            }
+            
+            // tasks配列を取得
+            let tasks = [];
+            if (parsedResult.success && Array.isArray(parsedResult.tasks)) {
+              tasks = parsedResult.tasks;
+            } else if (Array.isArray(parsedResult)) {
+              tasks = parsedResult;
+            } else {
+              console.warn('editTask: tasks配列が見つかりません:', parsedResult);
+              console.warn('editTask: parsedResult型:', typeof parsedResult);
+              console.warn('editTask: parsedResult.success:', parsedResult.success);
+              console.warn('editTask: parsedResult.tasks:', parsedResult.tasks);
+              console.warn('editTask: parsedResult.tasks型:', typeof parsedResult.tasks);
+              console.warn('editTask: parsedResult.tasksは配列か:', Array.isArray(parsedResult.tasks));
+              alert('タスクデータの取得に失敗しました');
+              return;
+            }
+            
+            // デバッグログ
+            console.log('editTask: tasks配列を取得しました:', tasks);
+            console.log('editTask: tasks型:', typeof tasks);
+            console.log('editTask: tasksは配列か:', Array.isArray(tasks));
+            console.log('editTask: tasks.length:', tasks ? tasks.length : 'null/undefined');
+            
+            // 配列チェック
+            if (!Array.isArray(tasks)) {
+              console.error('editTask: tasksが配列ではありません:', tasks);
+              alert('タスクデータの形式が正しくありません');
               return;
             }
             
