@@ -1584,22 +1584,15 @@
     
     // タスク一覧を読み込む
     function loadTasks() {
-      console.log('=== loadTasks() 開始 ===');
       google.script.run
         .withSuccessHandler(function(result) {
-          console.log('loadTasks success handler received:', result);
-          console.log('result type:', typeof result);
-          console.log('result isArray:', Array.isArray(result));
-          
           let tasks = [];
           let parsedResult = null;
           
           // JSON文字列の場合
           if (typeof result === 'string') {
             try {
-              console.log('loadTasks: JSON文字列として受け取り、パースを試行');
               parsedResult = JSON.parse(result);
-              console.log('loadTasks: JSONパース成功:', parsedResult);
             } catch (parseError) {
               console.error('loadTasks: JSONパースエラー:', parseError);
               allTasks = [];
@@ -1614,14 +1607,12 @@
           }
           // nullやundefinedの場合
           else if (!result) {
-            console.log('loadTasks: nullまたはundefinedを受け取りました');
             allTasks = [];
             applyFiltersAndSort();
             return;
           }
           // 配列で直接返されている場合（後方互換性）
           else if (Array.isArray(result)) {
-            console.log('loadTasks: 配列形式で受け取り');
             tasks = result;
             allTasks = tasks;
             applyFiltersAndSort();
@@ -1638,10 +1629,9 @@
           // parsedResultからtasksを抽出
           if (parsedResult) {
             if (parsedResult.success && Array.isArray(parsedResult.tasks)) {
-              console.log('loadTasks: オブジェクト形式で受け取り、tasks配列を抽出');
               tasks = parsedResult.tasks;
             } else if (parsedResult.error) {
-              console.error('loadTasks: エラーオブジェクトを受け取りました:', parsedResult);
+              console.error('loadTasks: エラー:', parsedResult.message);
               allTasks = [];
               applyFiltersAndSort();
               showError(parsedResult.message || 'タスクの取得に失敗しました');
@@ -1652,18 +1642,11 @@
             }
           }
           
-          console.log('loadTasks: 最終的なタスク数:', tasks.length);
-          console.log('loadTasks: 最終的なタスク:', JSON.stringify(tasks, null, 2));
           allTasks = tasks;
-          
-          console.log('loadTasks: applyFiltersAndSort()を呼び出し');
           applyFiltersAndSort();
-          console.log('=== loadTasks() 完了 ===');
         })
         .withFailureHandler(function(error) {
           console.error('getTasks failed:', error);
-          console.error('getTasks error type:', typeof error);
-          console.error('getTasks error details:', JSON.stringify(error, null, 2));
           allTasks = [];
           applyFiltersAndSort();
           showError(error);
@@ -1973,9 +1956,7 @@
         `;
       });
       
-      console.log('displayTasks: HTML生成完了、要素に設定');
       taskList.innerHTML = html;
-      console.log('=== displayTasks() 完了 ===');
     }
     
     // 労働負荷を読み込む
@@ -2218,21 +2199,10 @@
             } else if (Array.isArray(parsedResult)) {
               tasks = parsedResult;
             } else {
-              console.warn('editTask: tasks配列が見つかりません:', parsedResult);
-              console.warn('editTask: parsedResult型:', typeof parsedResult);
-              console.warn('editTask: parsedResult.success:', parsedResult.success);
-              console.warn('editTask: parsedResult.tasks:', parsedResult.tasks);
-              console.warn('editTask: parsedResult.tasks型:', typeof parsedResult.tasks);
-              console.warn('editTask: parsedResult.tasksは配列か:', Array.isArray(parsedResult.tasks));
-              alert('タスクデータの取得に失敗しました');
-              return;
-            }
-            
-            // デバッグログ
-            console.log('editTask: tasks配列を取得しました:', tasks);
-            console.log('editTask: tasks型:', typeof tasks);
-            console.log('editTask: tasksは配列か:', Array.isArray(tasks));
-            console.log('editTask: tasks.length:', tasks ? tasks.length : 'null/undefined');
+            console.warn('editTask: tasks配列が見つかりません:', parsedResult);
+            alert('タスクデータの取得に失敗しました');
+            return;
+          }
             
             // 配列チェック
             if (!Array.isArray(tasks)) {
