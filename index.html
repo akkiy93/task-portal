@@ -637,6 +637,8 @@
       font-size: 0.9rem;
       line-height: 1.6;
       padding-left: 4px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
     }
     
     .badge {
@@ -1068,15 +1070,15 @@
           </div>
           
           <div class="form-group">
-            <label for="task-matrix">タスクの緊急度・重要度</label>
+            <label for="task-matrix">タスクの優先度・重要度</label>
             <select id="task-matrix" name="matrix">
-              <option value="高緊急/高重要">高緊急/高重要（最優先）</option>
-              <option value="高緊急/低重要">高緊急/低重要（急いで対応）</option>
-              <option value="低緊急/高重要" selected>低緊急/高重要（計画的に実行）</option>
-              <option value="低緊急/低重要">低緊急/低重要（後回し可）</option>
+              <option value="高優先/高重要">高優先/高重要（最優先）</option>
+              <option value="高優先/低重要">高優先/低重要（急いで対応）</option>
+              <option value="低優先/高重要" selected>低優先/高重要（計画的に実行）</option>
+              <option value="低優先/低重要">低優先/低重要（後回し可）</option>
             </select>
             <small style="color: #666; font-size: 0.8rem; margin-top: 4px; display: block;">
-              緊急度：いつまでにやるか / 重要度：成果の大きさ
+              優先度：いつまでにやるか / 重要度：成果の大きさ
             </small>
           </div>
           
@@ -1087,10 +1089,7 @@
           
           <div class="form-group">
             <label for="task-deadline">締切日（任意）</label>
-            <div style="position: relative;">
-              <input type="date" id="task-deadline" name="deadline" style="width: 100%; padding-right: 40px;">
-              <span style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #667eea; font-size: 1.2rem;">📅</span>
-            </div>
+            <input type="date" id="task-deadline" name="deadline">
           </div>
           
           <button type="submit" class="btn btn-primary btn-submit-task">➕ タスクを追加</button>
@@ -1201,15 +1200,15 @@
           <input type="number" id="edit-task-hours" step="0.5" min="0" required>
         </div>
         <div class="form-group">
-          <label for="edit-task-matrix">タスクの緊急度・重要度</label>
+          <label for="edit-task-matrix">タスクの優先度・重要度</label>
           <select id="edit-task-matrix">
-            <option value="高緊急/高重要">高緊急/高重要（最優先）</option>
-            <option value="高緊急/低重要">高緊急/低重要（急いで対応）</option>
-            <option value="低緊急/高重要">低緊急/高重要（計画的に実行）</option>
-            <option value="低緊急/低重要">低緊急/低重要（後回し可）</option>
+            <option value="高優先/高重要">高優先/高重要（最優先）</option>
+            <option value="高優先/低重要">高優先/低重要（急いで対応）</option>
+            <option value="低優先/高重要">低優先/高重要（計画的に実行）</option>
+            <option value="低優先/低重要">低優先/低重要（後回し可）</option>
           </select>
           <small style="color: #666; font-size: 0.8rem; margin-top: 4px; display: block;">
-            緊急度：いつまでにやるか / 重要度：成果の大きさ
+            優先度：いつまでにやるか / 重要度：成果の大きさ
           </small>
         </div>
         <div class="form-group">
@@ -1218,10 +1217,7 @@
         </div>
         <div class="form-group">
           <label for="edit-task-deadline">締切日（任意）</label>
-          <div style="position: relative;">
-            <input type="date" id="edit-task-deadline" style="width: 100%; padding-right: 40px;">
-            <span style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #667eea; font-size: 1.2rem;">📅</span>
-          </div>
+          <input type="date" id="edit-task-deadline">
         </div>
         <div style="display: flex; gap: 10px;">
           <button type="submit" class="btn btn-primary" style="flex: 1;">更新</button>
@@ -1952,6 +1948,11 @@
     // マトリクス値を優先度・重要度に変換
     function parseMatrixValue(matrixValue) {
       const matrixMap = {
+        '高優先/高重要': { priority: '高', importance: '高' },
+        '高優先/低重要': { priority: '高', importance: '低' },
+        '低優先/高重要': { priority: '低', importance: '高' },
+        '低優先/低重要': { priority: '低', importance: '低' },
+        // 後方互換性のため、旧形式もサポート
         '高緊急/高重要': { priority: '高', importance: '高' },
         '高緊急/低重要': { priority: '高', importance: '低' },
         '低緊急/高重要': { priority: '低', importance: '高' },
@@ -2132,13 +2133,13 @@
             const importance = task.importance || '中';
             let matrixValue = '';
             if (priority === '高' && importance === '高') {
-              matrixValue = '高緊急/高重要';
+              matrixValue = '高優先/高重要';
             } else if (priority === '高' && importance === '低') {
-              matrixValue = '高緊急/低重要';
+              matrixValue = '高優先/低重要';
             } else if (priority === '低' && importance === '高') {
-              matrixValue = '低緊急/高重要';
+              matrixValue = '低優先/高重要';
             } else {
-              matrixValue = '低緊急/低重要';
+              matrixValue = '低優先/低重要';
             }
             document.getElementById('edit-task-matrix').value = matrixValue;
             
