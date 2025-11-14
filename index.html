@@ -281,11 +281,22 @@
     @media (max-width: 768px) {
       .main-content {
         grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
+      }
+      
+      /* モバイルではタスク一覧を上、追加フォームを下に配置 */
+      .main-content > .card:first-child {
+        order: 2;
+      }
+      
+      .main-content > .card:last-child {
+        order: 1;
       }
       
       .task-controls-row {
         flex-direction: column;
         align-items: stretch;
+        gap: 16px;
       }
       
       .sort-controls,
@@ -294,14 +305,32 @@
         justify-content: space-between;
       }
       
-      .task-meta {
-        flex-wrap: wrap;
-        gap: 5px;
+      .task-badges-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
       }
       
-      .task-header {
+      .task-title-main {
+        font-size: 1.15rem;
+      }
+      
+      .task-actions {
         flex-direction: column;
-        gap: 10px;
+      }
+      
+      .btn-edit, .btn-delete {
+        width: 100%;
+      }
+      
+      .btn-submit-task {
+        width: 100%;
+        font-size: 1rem;
+        padding: 14px 24px;
+      }
+      
+      .form-group input[type="date"] {
+        font-size: 16px; /* iOSでズームを防ぐ */
       }
     }
     
@@ -334,6 +363,15 @@
       font-weight: 600;
       color: #555;
       font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .form-group label .required-asterisk {
+      color: #e74c3c;
+      font-weight: bold;
+      font-size: 1rem;
     }
     
     .form-group input,
@@ -382,17 +420,35 @@
       transform: translateY(0);
     }
     
+    .btn-submit-task {
+      background: linear-gradient(135deg, #5568d3 0%, #667eea 100%);
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 16px 32px;
+      margin-top: 8px;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn-submit-task:hover {
+      background: linear-gradient(135deg, #4457c2 0%, #5568d3 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+    }
+    
     .task-list-controls {
-      margin-bottom: 20px;
-      padding-bottom: 15px;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
       border-bottom: 2px solid #e0e0e0;
+      background: #f8f9fa;
+      padding: 16px;
+      border-radius: 8px;
     }
     
     .task-controls-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 20px;
+      gap: 24px;
       flex-wrap: wrap;
     }
     
@@ -510,71 +566,88 @@
     
     .task-item {
       background: white;
-      padding: 18px;
+      padding: 20px;
       border-radius: 12px;
-      margin-bottom: 12px;
-      border-left: 5px solid #667eea;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+      margin-bottom: 16px;
+      border-left: 4px solid #667eea;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
       transition: all 0.3s ease;
+      position: relative;
     }
     
     .task-item:hover {
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+      border-left-width: 5px;
     }
     
     .task-item.completed {
-      opacity: 0.6;
-      background: #f5f5f5;
+      opacity: 0.7;
+      background: #f8f9fa;
+    }
+    
+    .task-item.completed .task-title-main {
+      text-decoration: line-through;
+      color: #999;
     }
     
     .task-item.priority-high {
       border-left-color: #e74c3c;
-      background: linear-gradient(to right, #fff5f5 0%, white 5%);
+      background: linear-gradient(to right, #fff5f5 0%, white 8%);
     }
     
     .task-item.priority-medium {
       border-left-color: #f39c12;
-      background: linear-gradient(to right, #fffbf0 0%, white 5%);
+      background: linear-gradient(to right, #fffbf0 0%, white 8%);
     }
     
     .task-item.priority-low {
       border-left-color: #27ae60;
-      background: linear-gradient(to right, #f0fff4 0%, white 5%);
+      background: linear-gradient(to right, #f0fff4 0%, white 8%);
     }
     
-    .task-header {
+    .task-badges-row {
       display: flex;
-      justify-content: space-between;
-      align-items: start;
-      margin-bottom: 8px;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 12px;
     }
     
-    .task-title {
-      font-weight: 600;
-      font-size: 1.1rem;
+    .task-title-main {
+      font-weight: 700;
+      font-size: 1.3rem;
       color: #333;
+      line-height: 1.5;
+      margin: 0 0 12px 0;
     }
     
-    .task-meta {
+    .task-meta-row {
       display: flex;
-      gap: 10px;
-      font-size: 0.85rem;
-      color: #666;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 12px;
     }
     
     .task-description {
       color: #555;
-      margin-top: 8px;
+      margin-top: 12px;
+      margin-bottom: 12px;
       font-size: 0.9rem;
+      line-height: 1.6;
+      padding-left: 4px;
     }
     
     .badge {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
       font-weight: 600;
+      white-space: nowrap;
+      line-height: 1.2;
     }
     
     .badge-priority-high {
@@ -661,17 +734,21 @@
     
     .task-actions {
       display: flex;
-      gap: 8px;
-      margin-top: 10px;
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e0e0e0;
     }
     
     .btn-edit, .btn-delete {
-      padding: 6px 12px;
+      padding: 8px 16px;
       border: none;
-      border-radius: 4px;
-      font-size: 0.85rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
+      flex: 1;
     }
     
     .btn-edit {
@@ -681,6 +758,8 @@
     
     .btn-edit:hover {
       background: #5568d3;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
     }
     
     .btn-delete {
@@ -690,14 +769,30 @@
     
     .btn-delete:hover {
       background: #c0392b;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
     }
     
     .task-status-select {
-      padding: 4px 8px;
+      padding: 6px 10px;
       border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
       cursor: pointer;
+      background: white;
+      transition: all 0.2s;
+    }
+    
+    .task-status-select:hover {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+    
+    .task-status-select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
     }
     
     .badge-status-completed {
@@ -734,12 +829,12 @@
     
     .modal-content {
       background-color: white;
-      margin: 10px auto;
+      margin: 20px auto;
       padding: 30px;
       border-radius: 12px;
       width: 90%;
       max-width: 500px;
-      max-height: calc(100vh - 20px);
+      max-height: calc(100vh - 40px);
       overflow-y: auto;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
       position: relative;
@@ -958,7 +1053,7 @@
         <h2>➕ タスクを追加</h2>
         <form id="task-form" class="task-form">
           <div class="form-group">
-            <label for="task-title">タイトル *</label>
+            <label for="task-title">タイトル <span class="required-asterisk">*</span></label>
             <input type="text" id="task-title" name="title" required>
           </div>
           
@@ -968,28 +1063,21 @@
           </div>
           
           <div class="form-group">
-            <label for="task-hours">見積もり時間（時間） *</label>
+            <label for="task-hours">見積もり時間（時間） <span class="required-asterisk">*</span></label>
             <input type="number" id="task-hours" name="estimatedHours" step="0.5" min="0" required>
           </div>
           
           <div class="form-group">
-            <label for="task-priority">優先度</label>
-            <select id="task-priority" name="priority">
-              <option value="高">高</option>
-              <option value="中" selected>中</option>
-              <option value="低">低</option>
+            <label for="task-matrix">タスクの緊急度・重要度</label>
+            <select id="task-matrix" name="matrix">
+              <option value="高緊急/高重要">高緊急/高重要（最優先）</option>
+              <option value="高緊急/低重要">高緊急/低重要（急いで対応）</option>
+              <option value="低緊急/高重要" selected>低緊急/高重要（計画的に実行）</option>
+              <option value="低緊急/低重要">低緊急/低重要（後回し可）</option>
             </select>
-            <small style="color: #666; font-size: 0.85rem;">※ 緊急度（いつまでにやるか）</small>
-          </div>
-          
-          <div class="form-group">
-            <label for="task-importance">重要度</label>
-            <select id="task-importance" name="importance">
-              <option value="高">高</option>
-              <option value="中" selected>中</option>
-              <option value="低">低</option>
-            </select>
-            <small style="color: #666; font-size: 0.85rem;">※ 重要さ（どれだけ重要か）</small>
+            <small style="color: #666; font-size: 0.8rem; margin-top: 4px; display: block;">
+              緊急度：いつまでにやるか / 重要度：成果の大きさ
+            </small>
           </div>
           
           <div class="form-group">
@@ -999,10 +1087,13 @@
           
           <div class="form-group">
             <label for="task-deadline">締切日（任意）</label>
-            <input type="date" id="task-deadline" name="deadline">
+            <div style="position: relative;">
+              <input type="date" id="task-deadline" name="deadline" style="width: 100%; padding-right: 40px;">
+              <span style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #667eea; font-size: 1.2rem;">📅</span>
+            </div>
           </div>
           
-          <button type="submit" class="btn btn-primary">タスクを追加</button>
+          <button type="submit" class="btn btn-primary btn-submit-task">➕ タスクを追加</button>
         </form>
       </div>
       
@@ -1098,7 +1189,7 @@
       <form id="edit-task-form" class="task-form">
         <input type="hidden" id="edit-task-id">
         <div class="form-group">
-          <label for="edit-task-title">タイトル *</label>
+          <label for="edit-task-title">タイトル <span class="required-asterisk">*</span></label>
           <input type="text" id="edit-task-title" required>
         </div>
         <div class="form-group">
@@ -1106,26 +1197,20 @@
           <textarea id="edit-task-description"></textarea>
         </div>
         <div class="form-group">
-          <label for="edit-task-hours">見積もり時間（時間） *</label>
+          <label for="edit-task-hours">見積もり時間（時間） <span class="required-asterisk">*</span></label>
           <input type="number" id="edit-task-hours" step="0.5" min="0" required>
         </div>
         <div class="form-group">
-          <label for="edit-task-priority">優先度</label>
-          <select id="edit-task-priority">
-            <option value="高">高</option>
-            <option value="中">中</option>
-            <option value="低">低</option>
+          <label for="edit-task-matrix">タスクの緊急度・重要度</label>
+          <select id="edit-task-matrix">
+            <option value="高緊急/高重要">高緊急/高重要（最優先）</option>
+            <option value="高緊急/低重要">高緊急/低重要（急いで対応）</option>
+            <option value="低緊急/高重要">低緊急/高重要（計画的に実行）</option>
+            <option value="低緊急/低重要">低緊急/低重要（後回し可）</option>
           </select>
-          <small style="color: #666; font-size: 0.85rem;">※ 緊急度（いつまでにやるか）</small>
-        </div>
-        <div class="form-group">
-          <label for="edit-task-importance">重要度</label>
-          <select id="edit-task-importance">
-            <option value="高">高</option>
-            <option value="中">中</option>
-            <option value="低">低</option>
-          </select>
-          <small style="color: #666; font-size: 0.85rem;">※ 重要さ（どれだけ重要か）</small>
+          <small style="color: #666; font-size: 0.8rem; margin-top: 4px; display: block;">
+            緊急度：いつまでにやるか / 重要度：成果の大きさ
+          </small>
         </div>
         <div class="form-group">
           <label for="edit-task-deliverable">提出先（任意）</label>
@@ -1133,7 +1218,10 @@
         </div>
         <div class="form-group">
           <label for="edit-task-deadline">締切日（任意）</label>
-          <input type="date" id="edit-task-deadline">
+          <div style="position: relative;">
+            <input type="date" id="edit-task-deadline" style="width: 100%; padding-right: 40px;">
+            <span style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #667eea; font-size: 1.2rem;">📅</span>
+          </div>
         </div>
         <div style="display: flex; gap: 10px;">
           <button type="submit" class="btn btn-primary" style="flex: 1;">更新</button>
@@ -1720,30 +1808,45 @@
         const statusClass = `badge-status-${task.status === '完了' ? 'completed' : task.status === '進行中' ? 'in-progress' : task.status === 'キャンセル' ? 'cancelled' : 'pending'}`;
         const isCompleted = task.status === '完了';
         
+        // 締切日の警告判定（3日以内）
+        let deadlineClass = '';
+        let deadlineWarning = false;
+        if (task.deadline) {
+          const deadline = new Date(task.deadline);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const diffTime = deadline - today;
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays >= 0 && diffDays <= 3) {
+            deadlineWarning = true;
+            deadlineClass = 'deadline-warning';
+          }
+        }
+        
         html += `
           <div class="task-item ${priorityClass} ${isCompleted ? 'completed' : ''}" data-task-id="${task.id}">
-            <div class="task-header">
-              <div class="task-title">${escapeHtml(task.title)}</div>
-              <div class="task-meta">
-                <select class="task-status-select" onchange="updateTaskStatus(${task.id}, this.value, this)">
-                  <option value="未着手" ${task.status === '未着手' ? 'selected' : ''}>未着手</option>
-                  <option value="進行中" ${task.status === '進行中' ? 'selected' : ''}>進行中</option>
-                  <option value="完了" ${task.status === '完了' ? 'selected' : ''}>完了</option>
-                  <option value="キャンセル" ${task.status === 'キャンセル' ? 'selected' : ''}>キャンセル</option>
-                </select>
-                <span class="badge ${badgeClass}">優先: ${escapeHtml(task.priority)}</span>
-                <span class="badge ${importanceBadgeClass}">重要: ${escapeHtml(task.importance || '中')}</span>
-                <span class="badge badge-hours">${task.estimatedHours}時間</span>
-              </div>
+            <div class="task-badges-row">
+              <select class="task-status-select" onchange="updateTaskStatus(${task.id}, this.value, this)">
+                <option value="未着手" ${task.status === '未着手' ? 'selected' : ''}>未着手</option>
+                <option value="進行中" ${task.status === '進行中' ? 'selected' : ''}>進行中</option>
+                <option value="完了" ${task.status === '完了' ? 'selected' : ''}>完了</option>
+                <option value="キャンセル" ${task.status === 'キャンセル' ? 'selected' : ''}>キャンセル</option>
+              </select>
+              <span class="badge ${badgeClass}">優先: ${escapeHtml(task.priority)}</span>
+              <span class="badge ${importanceBadgeClass}">重要: ${escapeHtml(task.importance || '中')}</span>
+              <span class="badge badge-hours">${task.estimatedHours}時間</span>
             </div>
+            <div class="task-title-main">${escapeHtml(task.title)}</div>
             ${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}
-            <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
-              ${task.deliverable ? `<span class="badge badge-deliverable">提出先: ${escapeHtml(task.deliverable)}</span>` : ''}
-              ${task.deadline ? `<span class="badge badge-deadline">締切: ${formatDate(task.deadline)}</span>` : ''}
+            ${(task.deliverable || task.deadline) ? `
+            <div class="task-meta-row">
+              ${task.deliverable ? `<span class="badge badge-deliverable">📎 提出先: ${escapeHtml(task.deliverable)}</span>` : ''}
+              ${task.deadline ? `<span class="badge badge-deadline ${deadlineClass}" style="${deadlineWarning ? 'font-weight: bold; background: #fff3e0; color: #e65100; border: 1px solid #ff9800;' : ''}">📅 締切: ${formatDate(task.deadline)}</span>` : ''}
             </div>
+            ` : ''}
             <div class="task-actions">
-              <button class="btn-edit" onclick="editTask(${task.id}, this)">編集</button>
-              <button class="btn-delete" onclick="deleteTask(${task.id}, this)">削除</button>
+              <button class="btn-edit" onclick="editTask(${task.id}, this)">✏️ 編集</button>
+              <button class="btn-delete" onclick="deleteTask(${task.id}, this)">🗑️ 削除</button>
             </div>
           </div>
         `;
@@ -1846,6 +1949,17 @@
       calendarContainer.innerHTML = html;
     }
     
+    // マトリクス値を優先度・重要度に変換
+    function parseMatrixValue(matrixValue) {
+      const matrixMap = {
+        '高緊急/高重要': { priority: '高', importance: '高' },
+        '高緊急/低重要': { priority: '高', importance: '低' },
+        '低緊急/高重要': { priority: '低', importance: '高' },
+        '低緊急/低重要': { priority: '低', importance: '低' }
+      };
+      return matrixMap[matrixValue] || { priority: '中', importance: '中' };
+    }
+    
     // タスク追加フォームの処理
     document.getElementById('task-form').addEventListener('submit', function(e) {
       e.preventDefault();
@@ -1853,12 +1967,16 @@
       const form = this;
       const submitButton = form.querySelector('button[type="submit"]');
       
+      // マトリクス値を優先度・重要度に変換
+      const matrixValue = document.getElementById('task-matrix').value;
+      const { priority, importance } = parseMatrixValue(matrixValue);
+      
       const formData = {
         title: document.getElementById('task-title').value,
         description: document.getElementById('task-description').value,
         estimatedHours: document.getElementById('task-hours').value,
-        priority: document.getElementById('task-priority').value,
-        importance: document.getElementById('task-importance').value,
+        priority: priority,
+        importance: importance,
         deliverable: document.getElementById('task-deliverable').value,
         deadline: document.getElementById('task-deadline').value,
         status: '未着手'
@@ -2008,8 +2126,22 @@
             document.getElementById('edit-task-title').value = task.title;
             document.getElementById('edit-task-description').value = task.description || '';
             document.getElementById('edit-task-hours').value = task.estimatedHours;
-            document.getElementById('edit-task-priority').value = task.priority;
-            document.getElementById('edit-task-importance').value = task.importance || '中';
+            
+            // 優先度・重要度からマトリクス値を計算
+            const priority = task.priority || '中';
+            const importance = task.importance || '中';
+            let matrixValue = '';
+            if (priority === '高' && importance === '高') {
+              matrixValue = '高緊急/高重要';
+            } else if (priority === '高' && importance === '低') {
+              matrixValue = '高緊急/低重要';
+            } else if (priority === '低' && importance === '高') {
+              matrixValue = '低緊急/高重要';
+            } else {
+              matrixValue = '低緊急/低重要';
+            }
+            document.getElementById('edit-task-matrix').value = matrixValue;
+            
             document.getElementById('edit-task-deliverable').value = task.deliverable || '';
             // 締切日を設定（ISO形式に変換）
             if (task.deadline) {
@@ -2044,12 +2176,17 @@
       const submitButton = form.querySelector('button[type="submit"]');
       
       const taskId = document.getElementById('edit-task-id').value;
+      
+      // マトリクス値を優先度・重要度に変換
+      const matrixValue = document.getElementById('edit-task-matrix').value;
+      const { priority, importance } = parseMatrixValue(matrixValue);
+      
       const taskData = {
         title: document.getElementById('edit-task-title').value,
         description: document.getElementById('edit-task-description').value,
         estimatedHours: document.getElementById('edit-task-hours').value,
-        priority: document.getElementById('edit-task-priority').value,
-        importance: document.getElementById('edit-task-importance').value,
+        priority: priority,
+        importance: importance,
         deliverable: document.getElementById('edit-task-deliverable').value,
         deadline: document.getElementById('edit-task-deadline').value
       };
