@@ -305,7 +305,13 @@
         justify-content: space-between;
       }
       
-      .task-badges-row {
+      .task-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      
+      .task-info-row {
         flex-direction: column;
         align-items: flex-start;
         gap: 8px;
@@ -566,9 +572,9 @@
     
     .task-item {
       background: white;
-      padding: 20px;
+      padding: 12px;
       border-radius: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 10px;
       border-left: 4px solid #667eea;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
       transition: all 0.3s ease;
@@ -606,36 +612,53 @@
       background: linear-gradient(to right, #f0fff4 0%, white 8%);
     }
     
-    .task-badges-row {
+    .task-header-row {
       display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
+      justify-content: space-between;
       align-items: center;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
+      gap: 12px;
+      flex-wrap: wrap;
     }
     
     .task-title-main {
       font-weight: 700;
-      font-size: 1.3rem;
+      font-size: 1.1rem;
       color: #333;
-      line-height: 1.5;
-      margin: 0 0 12px 0;
+      line-height: 1.4;
+      margin: 0;
+      flex: 1;
+      min-width: 200px;
     }
     
-    .task-meta-row {
+    .task-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    
+    .task-info-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    
+    .task-info-row-first,
+    .task-info-row-second {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
       align-items: center;
-      margin-top: 12px;
     }
     
     .task-description {
       color: #555;
-      margin-top: 12px;
-      margin-bottom: 12px;
-      font-size: 0.9rem;
-      line-height: 1.6;
+      margin-top: 8px;
+      margin-bottom: 8px;
+      font-size: 0.85rem;
+      line-height: 1.5;
       padding-left: 4px;
       white-space: pre-wrap;
       word-wrap: break-word;
@@ -644,9 +667,9 @@
     .badge {
       display: inline-flex;
       align-items: center;
-      padding: 5px 10px;
+      padding: 4px 8px;
       border-radius: 6px;
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       font-weight: 600;
       white-space: nowrap;
       line-height: 1.2;
@@ -735,22 +758,22 @@
     }
     
     .task-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #e0e0e0;
+      display: none; /* ヘッダーに移動したため非表示 */
+    }
+    
+    /* タスクカードの縦幅縮小のための追加調整 */
+    .task-header-actions {
+      gap: 6px;
     }
     
     .btn-edit, .btn-delete {
-      padding: 8px 16px;
+      padding: 6px 12px;
       border: none;
-      border-radius: 6px;
-      font-size: 0.875rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
-      flex: 1;
     }
     
     .btn-edit {
@@ -1104,9 +1127,10 @@
               <label for="task-sort">並び替え:</label>
               <select id="task-sort" class="task-sort-select">
                 <option value="priority">優先度</option>
+                <option value="deadline">締切日</option>
                 <option value="importance">重要度</option>
                 <option value="estimatedHours">見積もり時間</option>
-                <option value="deadline">締切日</option>
+                <option value="status">ステータス</option>
                 <option value="createdAt">作成日時</option>
                 <option value="updatedAt">更新日時</option>
                 <option value="title">タイトル</option>
@@ -1666,7 +1690,7 @@
       return tasks.filter(task => task && task.status !== '完了');
     }
     
-    // タスクのソート
+    // タスクのソート（最適化版：複数条件ソート対応）
     function sortTasks(tasks, sortBy, sortOrder) {
       if (!tasks || !Array.isArray(tasks)) {
         return [];
@@ -1674,46 +1698,145 @@
       const sorted = [...tasks].sort((a, b) => {
         if (!a || !b) return 0; // nullチェック
         let aVal, bVal;
+        let aVal2, bVal2; // 2次ソート用
         
         switch(sortBy) {
           case 'priority':
+            // 優先度 → 重要度 → 締切日 の順でソート
             const priorityOrder = { '高': 3, '中': 2, '低': 1 };
             aVal = priorityOrder[a.priority] || 0;
             bVal = priorityOrder[b.priority] || 0;
+            // 同じ優先度の場合、重要度で比較
+            if (aVal === bVal) {
+              const importanceOrder = { '高': 3, '中': 2, '低': 1 };
+              aVal2 = importanceOrder[a.importance] || 0;
+              bVal2 = importanceOrder[b.importance] || 0;
+              if (aVal2 !== bVal2) {
+                return sortOrder === 'asc' ? aVal2 - bVal2 : bVal2 - aVal2;
+              }
+              // 同じ重要度の場合、締切日で比較
+              if (a.deadline && b.deadline) {
+                aVal2 = new Date(a.deadline).getTime();
+                bVal2 = new Date(b.deadline).getTime();
+                return sortOrder === 'asc' ? aVal2 - bVal2 : bVal2 - aVal2;
+              }
+              if (!a.deadline && b.deadline) return 1;
+              if (a.deadline && !b.deadline) return -1;
+            }
+            break;
+          case 'deadline':
+            // 締切日 → 優先度 → 重要度 の順でソート
+            if (!a.deadline && !b.deadline) {
+              // 両方締切日がない場合、優先度で比較
+              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
+              aVal = priorityOrder[a.priority] || 0;
+              bVal = priorityOrder[b.priority] || 0;
+              if (aVal !== bVal) {
+                return sortOrder === 'asc' ? bVal - aVal : aVal - bVal;
+              }
+              // 同じ優先度の場合、重要度で比較
+              const importanceOrder = { '高': 3, '中': 2, '低': 1 };
+              aVal2 = importanceOrder[a.importance] || 0;
+              bVal2 = importanceOrder[b.importance] || 0;
+              return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
+            }
+            if (!a.deadline) return 1; // 締切日がないものは後ろに
+            if (!b.deadline) return -1;
+            aVal = new Date(a.deadline).getTime();
+            bVal = new Date(b.deadline).getTime();
+            // 同じ締切日の場合、優先度で比較
+            if (aVal === bVal) {
+              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
+              aVal2 = priorityOrder[a.priority] || 0;
+              bVal2 = priorityOrder[b.priority] || 0;
+              return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
+            }
             break;
           case 'importance':
+            // 重要度 → 優先度 → 締切日 の順でソート
             const importanceOrder = { '高': 3, '中': 2, '低': 1 };
             aVal = importanceOrder[a.importance] || 0;
             bVal = importanceOrder[b.importance] || 0;
+            // 同じ重要度の場合、優先度で比較
+            if (aVal === bVal) {
+              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
+              aVal2 = priorityOrder[a.priority] || 0;
+              bVal2 = priorityOrder[b.priority] || 0;
+              if (aVal2 !== bVal2) {
+                return sortOrder === 'asc' ? aVal2 - bVal2 : bVal2 - aVal2;
+              }
+              // 同じ優先度の場合、締切日で比較
+              if (a.deadline && b.deadline) {
+                aVal2 = new Date(a.deadline).getTime();
+                bVal2 = new Date(b.deadline).getTime();
+                return sortOrder === 'asc' ? aVal2 - bVal2 : bVal2 - aVal2;
+              }
+              if (!a.deadline && b.deadline) return 1;
+              if (a.deadline && !b.deadline) return -1;
+            }
             break;
           case 'estimatedHours':
             aVal = parseFloat(a.estimatedHours) || 0;
             bVal = parseFloat(b.estimatedHours) || 0;
+            // 同じ時間の場合、優先度で比較
+            if (aVal === bVal) {
+              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
+              aVal2 = priorityOrder[a.priority] || 0;
+              bVal2 = priorityOrder[b.priority] || 0;
+              return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
+            }
             break;
-          case 'deadline':
-            // 締切日がない場合は最後に表示（大きな値）
-            if (!a.deadline && !b.deadline) return 0;
-            if (!a.deadline) return 1;
-            if (!b.deadline) return -1;
-            aVal = new Date(a.deadline).getTime();
-            bVal = new Date(b.deadline).getTime();
+          case 'status':
+            // ステータス順：未着手 → 進行中 → 完了 → キャンセル
+            const statusOrder = { '未着手': 4, '進行中': 3, '完了': 2, 'キャンセル': 1 };
+            aVal = statusOrder[a.status] || 0;
+            bVal = statusOrder[b.status] || 0;
+            // 同じステータスの場合、優先度で比較
+            if (aVal === bVal) {
+              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
+              aVal2 = priorityOrder[a.priority] || 0;
+              bVal2 = priorityOrder[b.priority] || 0;
+              return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
+            }
             break;
           case 'createdAt':
             aVal = a.createdAt ? new Date(a.createdAt).getTime() : 0;
             bVal = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            // 同じ作成日時の場合、優先度で比較
+            if (aVal === bVal) {
+              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
+              aVal2 = priorityOrder[a.priority] || 0;
+              bVal2 = priorityOrder[b.priority] || 0;
+              return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
+            }
             break;
           case 'updatedAt':
             aVal = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
             bVal = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+            // 同じ更新日時の場合、優先度で比較
+            if (aVal === bVal) {
+              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
+              aVal2 = priorityOrder[a.priority] || 0;
+              bVal2 = priorityOrder[b.priority] || 0;
+              return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
+            }
             break;
           case 'title':
             aVal = (a.title || '').toLowerCase();
             bVal = (b.title || '').toLowerCase();
+            // 同じタイトルの場合、優先度で比較
+            if (aVal === bVal) {
+              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
+              aVal2 = priorityOrder[a.priority] || 0;
+              bVal2 = priorityOrder[b.priority] || 0;
+              return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
+            }
             break;
           default:
             return 0;
         }
         
+        // メインの比較
         if (sortBy === 'title') {
           return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
         } else {
@@ -1821,29 +1944,31 @@
         
         html += `
           <div class="task-item ${priorityClass} ${isCompleted ? 'completed' : ''}" data-task-id="${task.id}">
-            <div class="task-badges-row">
-              <select class="task-status-select" onchange="updateTaskStatus(${task.id}, this.value, this)">
-                <option value="未着手" ${task.status === '未着手' ? 'selected' : ''}>未着手</option>
-                <option value="進行中" ${task.status === '進行中' ? 'selected' : ''}>進行中</option>
-                <option value="完了" ${task.status === '完了' ? 'selected' : ''}>完了</option>
-                <option value="キャンセル" ${task.status === 'キャンセル' ? 'selected' : ''}>キャンセル</option>
-              </select>
-              <span class="badge ${badgeClass}">優先: ${escapeHtml(task.priority)}</span>
-              <span class="badge ${importanceBadgeClass}">重要: ${escapeHtml(task.importance || '中')}</span>
-              <span class="badge badge-hours">${task.estimatedHours}時間</span>
+            <div class="task-header-row">
+              <div class="task-title-main">${escapeHtml(task.title)}</div>
+              <div class="task-header-actions">
+                <select class="task-status-select" onchange="updateTaskStatus(${task.id}, this.value, this)">
+                  <option value="未着手" ${task.status === '未着手' ? 'selected' : ''}>未着手</option>
+                  <option value="進行中" ${task.status === '進行中' ? 'selected' : ''}>進行中</option>
+                  <option value="完了" ${task.status === '完了' ? 'selected' : ''}>完了</option>
+                  <option value="キャンセル" ${task.status === 'キャンセル' ? 'selected' : ''}>キャンセル</option>
+                </select>
+                <button class="btn-edit" onclick="editTask(${task.id}, this)">✏️ 編集</button>
+                <button class="btn-delete" onclick="deleteTask(${task.id}, this)">🗑️ 削除</button>
+              </div>
             </div>
-            <div class="task-title-main">${escapeHtml(task.title)}</div>
+            <div class="task-info-row">
+              <div class="task-info-row-first">
+                ${task.deliverable ? `<span class="badge badge-deliverable">📎 提出先: ${escapeHtml(task.deliverable)}</span>` : ''}
+                ${task.deadline ? `<span class="badge badge-deadline ${deadlineClass}">📅 締切: ${formatDate(task.deadline)}</span>` : ''}
+              </div>
+              <div class="task-info-row-second">
+                <span class="badge ${badgeClass}">優先度：${escapeHtml(task.priority)}</span>
+                <span class="badge ${importanceBadgeClass}">重要度：${escapeHtml(task.importance || '中')}</span>
+                <span class="badge badge-hours">想定時間：${task.estimatedHours}時間</span>
+              </div>
+            </div>
             ${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}
-            ${(task.deliverable || task.deadline) ? `
-            <div class="task-meta-row">
-              ${task.deliverable ? `<span class="badge badge-deliverable">📎 提出先: ${escapeHtml(task.deliverable)}</span>` : ''}
-              ${task.deadline ? `<span class="badge badge-deadline ${deadlineClass}" style="${deadlineWarning ? 'font-weight: bold; background: #fff3e0; color: #e65100; border: 1px solid #ff9800;' : ''}">📅 締切: ${formatDate(task.deadline)}</span>` : ''}
-            </div>
-            ` : ''}
-            <div class="task-actions">
-              <button class="btn-edit" onclick="editTask(${task.id}, this)">✏️ 編集</button>
-              <button class="btn-delete" onclick="deleteTask(${task.id}, this)">🗑️ 削除</button>
-            </div>
           </div>
         `;
       });
