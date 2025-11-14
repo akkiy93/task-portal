@@ -38,10 +38,38 @@ git config --global i18n.logoutputencoding utf-8
    git commit -F commit_msg.txt
    ```
 
-#### 例
+#### 自動実行（AIが実行）
+
+AIアシスタントがコミットする場合は、自動的に以下の手順で実行されます：
+
+1. UTF-8エンコードされた`commit_msg.txt`ファイルを作成
+2. `git commit -F commit_msg.txt`でコミット
+3. `commit_msg.txt`ファイルを削除
+
+これにより、文字化けを防ぎながら自動的にコミットできます。
+
+#### 手動実行の場合
+
+**方法1: VS Codeやメモ帳++などでUTF-8ファイルを作成（推奨）**
+
+1. VS Codeやメモ帳++などのエディタで`commit_msg.txt`を作成
+2. **エンコーディングをUTF-8に明示的に設定**（重要！）
+3. コミットメッセージを記入
+4. 保存
+5. コミット：
+   ```powershell
+   git add .
+   git commit -F commit_msg.txt
+   ```
+6. ファイルを削除（任意）：
+   ```powershell
+   Remove-Item commit_msg.txt
+   ```
+
+**方法2: PowerShellで作成（文字化けする可能性あり）**
 
 ```powershell
-# 1. コミットメッセージファイルを作成（UTF-8で保存）
+# 1. コミットメッセージファイルを作成
 @"
 Fix: 締切日の警告スタイル（枠線）を削除
 "@ | Out-File -FilePath commit_msg.txt -Encoding UTF8
@@ -53,6 +81,8 @@ git commit -F commit_msg.txt
 # 3. ファイルを削除（任意）
 Remove-Item commit_msg.txt
 ```
+
+**注意**: PowerShellの`Out-File -Encoding UTF8`でも文字化けする場合があります。その場合は方法1を使用してください。
 
 ### 3. PowerShellのエンコーディングを一時的に変更
 
