@@ -2648,6 +2648,7 @@
       
       if (!data.events || data.events.length === 0) {
         weekViewContainer.innerHTML = '<div class="loading">この週の会議予定はありません</div>';
+        return;
       }
       
       // データを保存（モーダル表示用）
