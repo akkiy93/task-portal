@@ -1,8 +1,8 @@
 /**
  * タスク管理ポータル - Google Apps Script
  * 
- * バージョン: v74
- * 変更内容: コードリファクタリング（デバッグログ整理、コメント改善）
+ * バージョン: v75
+ * 変更内容: カレンダー予定の表示改善と非表示機能、週単位カレンダー表示、詳細モーダル実装
  * 
  * 機能:
  * - タスクの一覧表示
@@ -654,46 +654,62 @@ function updateTaskStatus(taskId, status) {
 // ============================================================================
 
 /**
- * Googleカレンダーから今週の会議予定を取得
+ * Googleカレンダーから指定された週の会議予定を取得
+ * @param {string} weekStartISO - 週の開始日（ISO形式、オプション）
+ * @param {string} weekEndISO - 週の終了日（ISO形式、オプション）
  */
-function getCalendarEvents() {
+function getCalendarEvents(weekStartISO, weekEndISO) {
   try {
     const calendar = CalendarApp.getDefaultCalendar();
     if (!calendar) {
       return createErrorResponse('デフォルトカレンダーが見つかりません');
     }
     
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 7);
+    // 週の範囲を決定（パラメータが指定されていない場合は今週）
+    let startOfWeek, endOfWeek;
+    if (weekStartISO && weekEndISO) {
+      startOfWeek = new Date(weekStartISO);
+      endOfWeek = new Date(weekEndISO);
+    } else {
+      const now = new Date();
+      startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      
+      endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 7);
+    }
     
     const events = calendar.getEvents(startOfWeek, endOfWeek);
     
+    // すべてのイベントを表示（労働負荷計算除外リストは参照しない）
     const eventsData = events.map(event => {
-      const startTime = event.getStartTime();
-      const endTime = event.getEndTime();
-      const duration = (endTime - startTime) / (1000 * 60 * 60);
-      
-      return {
-        title: event.getTitle(),
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-        duration: duration,
-        location: event.getLocation() || ''
-      };
-    });
+        const startTime = event.getStartTime();
+        const endTime = event.getEndTime();
+        const duration = (endTime - startTime) / (1000 * 60 * 60);
+        
+        return {
+          id: event.getId(),  // イベントIDを追加
+          title: event.getTitle(),
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          duration: duration,
+          location: event.getLocation() || '',
+          description: event.getDescription() || ''  // 説明も追加
+        };
+      });
     
     const totalMeetingHours = eventsData.reduce((sum, event) => sum + event.duration, 0);
+    
+    // 労働負荷計算除外リストを取得（フロントエンドでボタン状態を表示するため）
+    const excludedEventIds = getExcludedFromWorkloadEvents();
     
     return {
       events: eventsData,
       totalMeetingHours: totalMeetingHours,
       weekStart: startOfWeek.toISOString(),
-      weekEnd: endOfWeek.toISOString()
+      weekEnd: endOfWeek.toISOString(),
+      excludedEventIds: excludedEventIds  // 除外リストを返す
     };
   } catch (error) {
     Logger.log('Error in getCalendarEvents: ' + error.toString());
@@ -718,9 +734,36 @@ function getWeeklyWorkload() {
       return createErrorResponse('タスクデータの形式が正しくありません');
     }
     
-    const calendarData = getCalendarEvents();
-    if (calendarData.error) {
-      Logger.log('カレンダー取得エラー: ' + calendarData.message);
+    // カレンダーイベントを取得（労働負荷計算用）
+    const calendar = CalendarApp.getDefaultCalendar();
+    let meetingHours = 0;
+    
+    if (calendar) {
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 7);
+      
+      const events = calendar.getEvents(startOfWeek, endOfWeek);
+      
+      // 労働負荷計算除外リストを取得
+      const excludedEventIds = getExcludedFromWorkloadEvents();
+      
+      const includedEvents = events.filter(event => {
+        // 除外リストに含まれていないイベントのみを計算に含める
+        const eventId = event.getId();
+        return !excludedEventIds.includes(eventId);
+      });
+      
+      meetingHours = includedEvents.reduce((sum, event) => {
+        const startTime = event.getStartTime();
+        const endTime = event.getEndTime();
+        const duration = (endTime - startTime) / (1000 * 60 * 60);
+        return sum + duration;
+      }, 0);
     }
     
     // 未完了のタスクの見積もり時間の合計
@@ -730,8 +773,6 @@ function getWeeklyWorkload() {
     const totalTaskHours = activeTasks.reduce((sum, task) => 
       sum + (parseFloat(task.estimatedHours) || 0), 0
     );
-    
-    const meetingHours = (calendarData.error ? 0 : (calendarData.totalMeetingHours || 0));
     const totalHours = totalTaskHours + meetingHours;
     const availableHours = 40 - totalHours;
     const utilizationRate = (totalHours / 40) * 100;
@@ -746,6 +787,95 @@ function getWeeklyWorkload() {
     };
   } catch (error) {
     Logger.log('Error in getWeeklyWorkload: ' + error.toString());
+    return createErrorResponse(error.toString());
+  }
+}
+
+// ============================================================================
+// カレンダー労働負荷計算除外管理関数
+// ============================================================================
+
+/**
+ * 労働負荷計算から除外するカレンダーイベントリストを取得
+ * @return {Array<string>} 除外イベントIDの配列
+ */
+function getExcludedFromWorkloadEvents() {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const excludedEventsJson = properties.getProperty('EXCLUDED_FROM_WORKLOAD_EVENTS');
+    
+    if (!excludedEventsJson) {
+      return [];
+    }
+    
+    const excludedEvents = JSON.parse(excludedEventsJson);
+    return Array.isArray(excludedEvents) ? excludedEvents : [];
+  } catch (error) {
+    Logger.log('Error in getExcludedFromWorkloadEvents: ' + error.toString());
+    return [];
+  }
+}
+
+/**
+ * カレンダーイベントを労働負荷計算から除外するリストに追加
+ * @param {string} eventId - 除外するイベントID
+ * @return {Object} 成功/エラーレスポンス
+ */
+function excludeEventFromWorkload(eventId) {
+  try {
+    if (!eventId || typeof eventId !== 'string') {
+      return createErrorResponse('イベントIDが無効です');
+    }
+    
+    const properties = PropertiesService.getScriptProperties();
+    const excludedEvents = getExcludedFromWorkloadEvents();
+    
+    // 既に除外リストに含まれている場合は何もしない
+    if (excludedEvents.includes(eventId)) {
+      return createSuccessResponse('イベントは既に労働負荷計算から除外されています', { eventId: eventId });
+    }
+    
+    // 除外リストに追加
+    excludedEvents.push(eventId);
+    const excludedEventsJson = JSON.stringify(excludedEvents);
+    properties.setProperty('EXCLUDED_FROM_WORKLOAD_EVENTS', excludedEventsJson);
+    
+    return createSuccessResponse('イベントを労働負荷計算から除外しました', { eventId: eventId });
+  } catch (error) {
+    Logger.log('Error in excludeEventFromWorkload: ' + error.toString());
+    return createErrorResponse(error.toString());
+  }
+}
+
+/**
+ * カレンダーイベントを労働負荷計算から除外するリストから削除（再計算に含める）
+ * @param {string} eventId - 再計算に含めるイベントID
+ * @return {Object} 成功/エラーレスポンス
+ */
+function includeEventInWorkload(eventId) {
+  try {
+    if (!eventId || typeof eventId !== 'string') {
+      return createErrorResponse('イベントIDが無効です');
+    }
+    
+    const properties = PropertiesService.getScriptProperties();
+    const excludedEvents = getExcludedFromWorkloadEvents();
+    
+    // 除外リストから削除
+    const filteredEvents = excludedEvents.filter(id => id !== eventId);
+    
+    if (filteredEvents.length === excludedEvents.length) {
+      // 変更がない場合（既に計算に含まれている）
+      return createSuccessResponse('イベントは既に労働負荷計算に含まれています', { eventId: eventId });
+    }
+    
+    // 更新されたリストを保存
+    const excludedEventsJson = JSON.stringify(filteredEvents);
+    properties.setProperty('EXCLUDED_FROM_WORKLOAD_EVENTS', excludedEventsJson);
+    
+    return createSuccessResponse('イベントを労働負荷計算に含めました', { eventId: eventId });
+  } catch (error) {
+    Logger.log('Error in includeEventInWorkload: ' + error.toString());
     return createErrorResponse(error.toString());
   }
 }
