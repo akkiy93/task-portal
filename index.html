@@ -744,6 +744,44 @@
       border-radius: 6px;
       margin-bottom: 8px;
       font-size: 0.9rem;
+      border-left: 3px solid #667eea;
+      transition: transform 0.2s, box-shadow 0.2s;
+      position: relative;
+    }
+    
+    .calendar-event.today {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px;
+      font-size: 1.1rem;
+      border-left: 5px solid white;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      transform: scale(1.02);
+    }
+    
+    .calendar-event.today .calendar-event-title {
+      color: white;
+      font-weight: 700;
+    }
+    
+    .calendar-event.today .calendar-event-time {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 0.95rem;
+    }
+    
+    .calendar-event.this-week {
+      background: #f0f4ff;
+      padding: 12px;
+      font-size: 0.95rem;
+      border-left: 3px solid #667eea;
+    }
+    
+    .calendar-event.future-week {
+      background: #f8f9fa;
+      padding: 10px;
+      font-size: 0.85rem;
+      border-left: 2px solid #999;
+      opacity: 0.7;
     }
     
     .calendar-event-title {
@@ -755,6 +793,400 @@
       color: #666;
       font-size: 0.85rem;
       margin-top: 4px;
+    }
+    
+    .calendar-event-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      align-items: center;
+    }
+    
+    .calendar-event-hide-btn {
+      background: rgba(231, 76, 60, 0.1);
+      color: #e74c3c;
+      border: 1px solid #e74c3c;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .calendar-event-hide-btn:hover {
+      background: #e74c3c;
+      color: white;
+    }
+    
+    .calendar-event.today .calendar-event-hide-btn {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border-color: white;
+    }
+    
+    .calendar-event.today .calendar-event-hide-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    
+    .calendar-view-toggle {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .view-toggle-btn {
+      padding: 6px 12px;
+      border: 1px solid #667eea;
+      background: white;
+      color: #667eea;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+    
+    .view-toggle-btn:hover {
+      background: #f0f4ff;
+    }
+    
+    .view-toggle-btn.active {
+      background: #667eea;
+      color: white;
+    }
+    
+    .calendar-week-view {
+      margin-top: 15px;
+    }
+    
+    .calendar-week-navigation {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    
+    .calendar-week-nav-btn {
+      padding: 8px 16px;
+      border: 1px solid #667eea;
+      background: white;
+      color: #667eea;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+      font-weight: 600;
+    }
+    
+    .calendar-week-nav-btn:hover {
+      background: #667eea;
+      color: white;
+    }
+    
+    .calendar-week-nav-btn:active {
+      transform: scale(0.95);
+    }
+    
+    .calendar-week-grid {
+      display: grid;
+      grid-template-columns: 80px repeat(7, 1fr);
+      gap: 1px;
+      background: #ddd;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .calendar-week-header {
+      background: #667eea;
+      color: white;
+      padding: 12px 8px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .calendar-week-day-header {
+      background: #764ba2;
+      color: white;
+      padding: 12px 8px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 1rem;
+    }
+    
+    .calendar-week-day-header.today {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-size: 1.2rem;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    }
+    
+    .calendar-week-day-header.today span {
+      font-size: 1.5rem !important;
+      font-weight: 800;
+    }
+    
+    .calendar-week-time-slot {
+      background: #f8f9fa;
+      padding: 8px 4px;
+      text-align: center;
+      font-size: 0.75rem;
+      color: #666;
+      border-right: 1px solid #ddd;
+    }
+    
+    .calendar-week-day-cell {
+      background: white;
+      min-height: 40px;
+      padding: 2px;
+      position: relative;
+      border-right: 1px solid #ddd;
+    }
+    
+    .calendar-week-event {
+      position: absolute;
+      left: 2px;
+      right: 2px;
+      padding: 4px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      z-index: 1;
+      transition: all 0.2s;
+    }
+    
+    .calendar-week-event:hover {
+      transform: scale(1.02);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      z-index: 2;
+    }
+    
+    .calendar-week-event {
+      background: #e3f2fd;
+      color: #1976d2;
+      border-left: 3px solid #1976d2;
+    }
+    
+    .calendar-event-modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      overflow: auto;
+    }
+    
+    .calendar-event-modal-content {
+      background-color: white;
+      margin: 3% auto;
+      padding: 30px 35px;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 650px;
+      max-height: 90vh;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .calendar-event-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+    
+    .calendar-event-modal-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #667eea;
+      margin: 0;
+    }
+    
+    .calendar-event-modal-close {
+      background: none;
+      border: none;
+      font-size: 2rem;
+      color: #999;
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+    
+    .calendar-event-modal-close:hover {
+      background: #f0f0f0;
+      color: #333;
+    }
+    
+    .calendar-event-modal-body {
+      margin-bottom: 20px;
+      overflow-y: auto;
+      flex: 1;
+      padding-right: 5px;
+    }
+    
+    .calendar-event-modal-body::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .calendar-event-modal-body::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+    
+    .calendar-event-modal-body::-webkit-scrollbar-thumb {
+      background: #ccc;
+      border-radius: 3px;
+    }
+    
+    .calendar-event-modal-body::-webkit-scrollbar-thumb:hover {
+      background: #aaa;
+    }
+    
+    .calendar-event-modal-info {
+      margin-bottom: 18px;
+    }
+    
+    .calendar-event-modal-info:last-child {
+      margin-bottom: 0;
+    }
+    
+    .calendar-event-modal-info-label {
+      font-weight: 600;
+      color: #555;
+      font-size: 0.85rem;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+    
+    .calendar-event-modal-info-value {
+      color: #333;
+      font-size: 1rem;
+      line-height: 1.6;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      white-space: pre-wrap;
+    }
+    
+    .calendar-event-modal-info-value.description {
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      border: 1px solid #e9ecef;
+    }
+    
+    .calendar-event-modal-info-value.description::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .calendar-event-modal-info-value.description::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+    
+    .calendar-event-modal-info-value.description::-webkit-scrollbar-thumb {
+      background: #ccc;
+      border-radius: 3px;
+    }
+    
+    .calendar-event-modal-info-value.description::-webkit-scrollbar-thumb:hover {
+      background: #aaa;
+    }
+    
+    .calendar-event-modal-info-value a {
+      color: #667eea;
+      text-decoration: none;
+      word-break: break-all;
+    }
+    
+    .calendar-event-modal-info-value a:hover {
+      text-decoration: underline;
+    }
+    
+    .calendar-event-modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      padding-top: 20px;
+      border-top: 2px solid #f0f0f0;
+      margin-top: auto;
+      flex-shrink: 0;
+    }
+    
+    .calendar-event-modal-btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    
+    .calendar-event-modal-btn-exclude {
+      background: #f39c12;
+      color: white;
+    }
+    
+    .calendar-event-modal-btn-exclude:hover {
+      background: #e67e22;
+    }
+    
+    .calendar-event-modal-btn-exclude.excluded {
+      background: #27ae60;
+    }
+    
+    .calendar-event-modal-btn-exclude.excluded:hover {
+      background: #229954;
+    }
+    
+    .calendar-event-modal-btn-close {
+      background: #f0f0f0;
+      color: #666;
+    }
+    
+    .calendar-event-modal-btn-close:hover {
+      background: #e0e0e0;
+    }
+    
+    .calendar-week-event-exclude-btn {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      background: rgba(243, 156, 18, 0.9);
+      color: white;
+      border: none;
+      border-radius: 3px;
+      padding: 2px 6px;
+      font-size: 0.65rem;
+      cursor: pointer;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    
+    .calendar-week-event:hover .calendar-week-event-exclude-btn {
+      opacity: 1;
+    }
+    
+    .calendar-week-event-exclude-btn.excluded {
+      background: rgba(39, 174, 96, 0.9);
     }
     
     .task-actions {
@@ -1156,8 +1588,22 @@
     </div>
     
     <div class="card" style="margin-top: 20px;">
-      <h2>📅 今週の会議予定</h2>
-      <div id="calendar-events" class="calendar-events">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h2 style="margin: 0;">📅 週間カレンダー</h2>
+        <div class="calendar-week-navigation">
+          <button class="calendar-week-nav-btn" onclick="moveWeek(-1)" title="前の週">
+            ◀ 前の週
+          </button>
+          <button class="calendar-week-nav-btn" onclick="moveWeekToToday()" title="今週に戻る">
+            今日
+          </button>
+          <button class="calendar-week-nav-btn" onclick="moveWeek(1)" title="次の週">
+            次の週 ▶
+          </button>
+        </div>
+      </div>
+      <div id="calendar-week-info" style="margin-bottom: 10px; color: #666; font-size: 0.9rem;"></div>
+      <div id="calendar-week-view" class="calendar-week-view">
         <div class="loading">読み込み中...</div>
       </div>
     </div>
@@ -1248,6 +1694,42 @@
           <button type="button" class="btn" onclick="closeEditModal()" style="flex: 1; background: #e0e0e0;">キャンセル</button>
         </div>
       </form>
+    </div>
+  </div>
+  
+  <!-- カレンダーイベント詳細モーダル -->
+  <div id="calendar-event-modal" class="calendar-event-modal">
+    <div class="calendar-event-modal-content">
+      <div class="calendar-event-modal-header">
+        <h3 class="calendar-event-modal-title" id="calendar-event-modal-title">予定の詳細</h3>
+        <button class="calendar-event-modal-close" onclick="closeCalendarEventModal()">&times;</button>
+      </div>
+      <div class="calendar-event-modal-body">
+        <div class="calendar-event-modal-info">
+          <div class="calendar-event-modal-info-label">日時</div>
+          <div class="calendar-event-modal-info-value" id="calendar-event-modal-datetime"></div>
+        </div>
+        <div class="calendar-event-modal-info">
+          <div class="calendar-event-modal-info-label">場所</div>
+          <div class="calendar-event-modal-info-value" id="calendar-event-modal-location"></div>
+        </div>
+        <div class="calendar-event-modal-info">
+          <div class="calendar-event-modal-info-label">説明</div>
+          <div class="calendar-event-modal-info-value description" id="calendar-event-modal-description"></div>
+        </div>
+        <div class="calendar-event-modal-info">
+          <div class="calendar-event-modal-info-label">所要時間</div>
+          <div class="calendar-event-modal-info-value" id="calendar-event-modal-duration"></div>
+        </div>
+      </div>
+      <div class="calendar-event-modal-actions">
+        <button class="calendar-event-modal-btn calendar-event-modal-btn-exclude" id="calendar-event-modal-exclude-btn">
+          📊 労働負荷計算から除外
+        </button>
+        <button class="calendar-event-modal-btn calendar-event-modal-btn-close" onclick="closeCalendarEventModal()">
+          閉じる
+        </button>
+      </div>
     </div>
   </div>
   
@@ -2011,45 +2493,352 @@
     
     // カレンダーイベントを読み込む
     function loadCalendarEvents() {
+      const startOfWeek = getCurrentWeekStart();
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 7);
+      
       google.script.run
         .withSuccessHandler(displayCalendarEvents)
         .withFailureHandler(showError)
-        .getCalendarEvents();
+        .getCalendarEvents(startOfWeek.toISOString(), endOfWeek.toISOString());
     }
     
-    // カレンダーイベントを表示
+    // カレンダーイベントを表示（週表示カレンダー用）
     function displayCalendarEvents(data) {
-      const calendarContainer = document.getElementById('calendar-events');
+      // データを保存
+      window.calendarEventsData = data;
+      // 週表示を更新
+      displayWeekCalendar(data);
+    }
+    
+    // 労働負荷計算の除外/含めるを切り替え
+    function toggleWorkloadExclusion(eventId, buttonElement) {
+      if (!eventId) {
+        alert('イベントIDが無効です');
+        return;
+      }
+      
+      if (!window.calendarEventsData || !window.calendarEventsData.excludedEventIds) {
+        alert('イベントデータが見つかりません');
+        return;
+      }
+      
+      const isExcluded = window.calendarEventsData.excludedEventIds.includes(eventId);
+      const action = isExcluded ? 'includeEventInWorkload' : 'excludeEventFromWorkload';
+      const actionText = isExcluded ? '計算に含める' : '計算から除外';
+      
+      // ボタンを無効化
+      if (buttonElement) {
+        buttonElement.disabled = true;
+        buttonElement.textContent = '処理中...';
+      }
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.error) {
+            alert('エラー: ' + result.message);
+            if (buttonElement) {
+              buttonElement.disabled = false;
+              updateExcludeButtonState(buttonElement, isExcluded);
+            }
+          } else {
+            // 成功したら除外リストを更新
+            if (isExcluded) {
+              // 除外リストから削除
+              window.calendarEventsData.excludedEventIds = 
+                window.calendarEventsData.excludedEventIds.filter(id => id !== eventId);
+            } else {
+              // 除外リストに追加
+              if (!window.calendarEventsData.excludedEventIds) {
+                window.calendarEventsData.excludedEventIds = [];
+              }
+              window.calendarEventsData.excludedEventIds.push(eventId);
+            }
+            
+            // ボタン状態を更新
+            if (buttonElement) {
+              buttonElement.disabled = false;
+              updateExcludeButtonState(buttonElement, !isExcluded);
+            }
+            
+            // 労働負荷を再読み込み
+            loadWorkload();
+            
+            // 週表示カレンダーを更新（ボタン状態を反映）
+            displayWeekCalendar(window.calendarEventsData);
+          }
+        })
+        .withFailureHandler(function(error) {
+          alert('エラーが発生しました: ' + error);
+          if (buttonElement) {
+            buttonElement.disabled = false;
+            updateExcludeButtonState(buttonElement, isExcluded);
+          }
+        })[action](eventId);
+    }
+    
+    // 除外ボタンの状態を更新
+    function updateExcludeButtonState(buttonElement, isExcluded) {
+      if (buttonElement.classList.contains('calendar-week-event-exclude-btn')) {
+        // 週表示カレンダーのボタン
+        if (isExcluded) {
+          buttonElement.textContent = '✓ 計算に含める';
+          buttonElement.classList.add('excluded');
+        } else {
+          buttonElement.textContent = '📊 除外';
+          buttonElement.classList.remove('excluded');
+        }
+      } else if (buttonElement.id === 'calendar-event-modal-exclude-btn') {
+        // モーダルのボタン
+        if (isExcluded) {
+          buttonElement.textContent = '✓ 労働負荷計算に含める';
+          buttonElement.classList.add('excluded');
+        } else {
+          buttonElement.textContent = '📊 労働負荷計算から除外';
+          buttonElement.classList.remove('excluded');
+        }
+      }
+    }
+    
+    // 現在表示している週の開始日を保持
+    window.currentWeekStart = null;
+    
+    // 指定された日付の週の開始日（日曜日）を取得
+    function getStartOfWeek(date) {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - d.getDay());
+      return d;
+    }
+    
+    // 現在表示している週の開始日を取得（未設定の場合は今週）
+    function getCurrentWeekStart() {
+      if (window.currentWeekStart) {
+        return new Date(window.currentWeekStart);
+      }
+      const today = new Date();
+      window.currentWeekStart = getStartOfWeek(today);
+      return new Date(window.currentWeekStart);
+    }
+    
+    // 週を移動する
+    function moveWeek(direction) {
+      const currentStart = getCurrentWeekStart();
+      const newWeekStart = new Date(currentStart);
+      newWeekStart.setDate(currentStart.getDate() + (direction * 7));
+      window.currentWeekStart = newWeekStart;
+      loadCalendarEvents();
+    }
+    
+    // 今週に戻る
+    function moveWeekToToday() {
+      const today = new Date();
+      window.currentWeekStart = getStartOfWeek(today);
+      loadCalendarEvents();
+    }
+    
+    // 週表示カレンダーを表示
+    function displayWeekCalendar(data) {
+      const weekViewContainer = document.getElementById('calendar-week-view');
       
       if (data.error) {
-        calendarContainer.innerHTML = '<div class="error">エラー: ' + data.message + '</div>';
+        weekViewContainer.innerHTML = '<div class="error">エラー: ' + data.message + '</div>';
         return;
       }
       
       if (!data.events || data.events.length === 0) {
-        calendarContainer.innerHTML = '<div class="loading">今週の会議予定はありません</div>';
+        weekViewContainer.innerHTML = '<div class="loading">この週の会議予定はありません</div>';
         return;
       }
       
-      let html = '';
-      data.events.forEach(event => {
-        const startDate = new Date(event.startTime);
-        const endDate = new Date(event.endTime);
-        const dateStr = startDate.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
-        const timeStr = startDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) + 
-                       ' - ' + 
-                       endDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-        
-        html += `
-          <div class="calendar-event">
-            <div class="calendar-event-title">${escapeHtml(event.title)}</div>
-            <div class="calendar-event-time">${dateStr} ${timeStr} (${event.duration.toFixed(1)}時間)</div>
-          </div>
-        `;
+      // データを保存（モーダル表示用）
+      window.calendarEventsData = data;
+      
+      // 日付判定用の基準日を設定
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // 現在表示している週の開始日を取得
+      const startOfWeek = getCurrentWeekStart();
+      
+      // 週の日付配列を作成
+      const weekDays = [];
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startOfWeek);
+        date.setDate(startOfWeek.getDate() + i);
+        weekDays.push(date);
+      }
+      
+      // 週の情報を表示
+      const weekInfoElement = document.getElementById('calendar-week-info');
+      const weekEndForDisplay = new Date(startOfWeek);
+      weekEndForDisplay.setDate(startOfWeek.getDate() + 6);
+      const weekInfoText = `${startOfWeek.getFullYear()}年${startOfWeek.getMonth() + 1}月${startOfWeek.getDate()}日 ～ ${weekEndForDisplay.getFullYear()}年${weekEndForDisplay.getMonth() + 1}月${weekEndForDisplay.getDate()}日`;
+      if (weekInfoElement) {
+        weekInfoElement.textContent = weekInfoText;
+      }
+      
+      // 時間スロット（6時〜21時）
+      const timeSlots = [];
+      for (let hour = 6; hour <= 21; hour++) {
+        timeSlots.push(hour);
+      }
+      
+      // イベントを日付と時間でグループ化
+      const eventsByDay = {};
+      weekDays.forEach((day, dayIndex) => {
+        eventsByDay[dayIndex] = [];
       });
       
-      calendarContainer.innerHTML = html;
+      data.events.forEach(event => {
+        const startDate = new Date(event.startTime);
+        const eventDay = new Date(startDate);
+        eventDay.setHours(0, 0, 0, 0);
+        
+        // 週のどの日かを判定
+        const dayIndex = Math.floor((eventDay - startOfWeek) / (1000 * 60 * 60 * 24));
+        if (dayIndex >= 0 && dayIndex < 7) {
+          if (!eventsByDay[dayIndex]) {
+            eventsByDay[dayIndex] = [];
+          }
+          eventsByDay[dayIndex].push(event);
+        }
+      });
+      
+      // HTMLを生成
+      let html = '<div class="calendar-week-grid">';
+      
+      // ヘッダー行（時間列 + 曜日）
+      html += '<div class="calendar-week-header"></div>';
+      weekDays.forEach(day => {
+        const dayName = ['日', '月', '火', '水', '木', '金', '土'][day.getDay()];
+        const dayNum = day.getDate();
+        const isToday = day.getTime() === today.getTime();
+        html += `<div class="calendar-week-day-header ${isToday ? 'today' : ''}">${dayName}<br><span style="font-size: 1.5rem; font-weight: 800;">${dayNum}</span></div>`;
+      });
+      
+      // 時間スロット行
+      timeSlots.forEach(hour => {
+        // 時間列
+        html += `<div class="calendar-week-time-slot">${hour}:00</div>`;
+        
+        // 各日のセル
+        weekDays.forEach((day, dayIndex) => {
+          const dayEvents = eventsByDay[dayIndex] || [];
+          const hourEvents = dayEvents.filter(event => {
+            const eventStart = new Date(event.startTime);
+            return eventStart.getHours() === hour;
+          });
+          
+          html += '<div class="calendar-week-day-cell">';
+          
+          hourEvents.forEach(event => {
+            const startDate = new Date(event.startTime);
+            const endDate = new Date(event.endTime);
+            
+            const topPercent = (startDate.getMinutes() / 60) * 100;
+            const heightPercent = ((endDate - startDate) / (1000 * 60 * 60)) * 100;
+            
+            // 除外リストに含まれているかチェック
+            const isExcluded = data.excludedEventIds && data.excludedEventIds.includes(event.id);
+            const excludeBtnClass = isExcluded ? 'excluded' : '';
+            const excludeBtnText = isExcluded ? '✓ 計算に含める' : '📊 除外';
+            
+            html += `
+              <div class="calendar-week-event" 
+                   style="top: ${topPercent}%; height: ${Math.max(heightPercent, 20)}%;"
+                   onclick="showCalendarEventModal('${escapeHtml(event.id)}')"
+                   title="${escapeHtml(event.title)}">
+                ${escapeHtml(event.title)}
+                <button class="calendar-week-event-exclude-btn ${excludeBtnClass}" 
+                        onclick="event.stopPropagation(); toggleWorkloadExclusion('${escapeHtml(event.id)}', this)">
+                  ${excludeBtnText}
+                </button>
+              </div>
+            `;
+          });
+          
+          html += '</div>';
+        });
+      });
+      
+      html += '</div>';
+      weekViewContainer.innerHTML = html;
     }
+    
+    // カレンダーイベント詳細モーダルを表示
+    function showCalendarEventModal(eventId) {
+      if (!window.calendarEventsData || !window.calendarEventsData.events) {
+        alert('イベントデータが見つかりません');
+        return;
+      }
+      
+      const event = window.calendarEventsData.events.find(e => e.id === eventId);
+      if (!event) {
+        alert('イベントが見つかりません');
+        return;
+      }
+      
+      // モーダルにデータを設定
+      const startDate = new Date(event.startTime);
+      const endDate = new Date(event.endTime);
+      const dateStr = startDate.toLocaleDateString('ja-JP', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        weekday: 'short'
+      });
+      const timeStr = startDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) + 
+                     ' - ' + 
+                     endDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      
+      document.getElementById('calendar-event-modal-title').textContent = event.title;
+      document.getElementById('calendar-event-modal-datetime').textContent = dateStr + ' ' + timeStr;
+      document.getElementById('calendar-event-modal-location').textContent = event.location || '（場所未設定）';
+      
+      // 説明フィールドはHTMLとしてレンダリング（改行タグなどを有効化）
+      const descriptionElement = document.getElementById('calendar-event-modal-description');
+      const description = event.description || '（説明なし）';
+      // 基本的なXSS対策：危険なタグをエスケープしつつ、<br>と<a>タグは許可
+      const sanitizedDescription = sanitizeHtml(description);
+      descriptionElement.innerHTML = sanitizedDescription;
+      
+      document.getElementById('calendar-event-modal-duration').textContent = event.duration.toFixed(1) + '時間';
+      
+      // 除外ボタンの状態を設定
+      const excludeBtn = document.getElementById('calendar-event-modal-exclude-btn');
+      const isExcluded = window.calendarEventsData.excludedEventIds && 
+                        window.calendarEventsData.excludedEventIds.includes(eventId);
+      
+      if (isExcluded) {
+        excludeBtn.textContent = '✓ 労働負荷計算に含める';
+        excludeBtn.classList.add('excluded');
+      } else {
+        excludeBtn.textContent = '📊 労働負荷計算から除外';
+        excludeBtn.classList.remove('excluded');
+      }
+      
+      excludeBtn.onclick = function() {
+        toggleWorkloadExclusion(eventId, excludeBtn);
+      };
+      
+      // モーダルを表示
+      document.getElementById('calendar-event-modal').style.display = 'block';
+    }
+    
+    // カレンダーイベント詳細モーダルを閉じる
+    function closeCalendarEventModal() {
+      document.getElementById('calendar-event-modal').style.display = 'none';
+    }
+    
+    // displayCalendarEvents関数を修正して、週表示を更新する
+    const originalDisplayCalendarEvents = displayCalendarEvents;
+    displayCalendarEvents = function(data) {
+      // データを保存
+      window.calendarEventsData = data;
+      // 週表示を更新
+      displayWeekCalendar(data);
+    };
     
     // マトリクス値を優先度・重要度に変換
     function parseMatrixValue(matrixValue) {
@@ -2120,6 +2909,39 @@
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+    
+    // HTMLをサニタイズ（改行タグとリンクタグを許可）
+    function sanitizeHtml(html) {
+      if (!html) return '';
+      
+      // <br>タグを改行に変換
+      let processed = html.replace(/<br\s*\/?>/gi, '\n');
+      
+      // <a>タグを抽出して保護
+      const links = [];
+      processed = processed.replace(/<a\s+href=["']([^"']+)["'][^>]*>([^<]*)<\/a>/gi, (match, href, text) => {
+        const linkId = `__LINK_${links.length}__`;
+        links.push({ id: linkId, href: href.trim(), text: text.trim() });
+        return linkId;
+      });
+      
+      // すべてのHTMLタグをエスケープ
+      const div = document.createElement('div');
+      div.textContent = processed;
+      let sanitized = div.innerHTML;
+      
+      // リンクを復元（エスケープされたプレースホルダーを探す）
+      links.forEach(({ id, href, text }) => {
+        const escapedId = escapeHtml(id);
+        const safeLink = `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a>`;
+        sanitized = sanitized.replace(escapedId, safeLink);
+      });
+      
+      // 改行を<br>に変換
+      sanitized = sanitized.replace(/\n/g, '<br>');
+      
+      return sanitized;
     }
     
     // 日付をフォーマット（YYYY-MM-DD形式を日本語形式に変換）
