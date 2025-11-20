@@ -1,8 +1,8 @@
 /**
  * タスク管理ポータル - Google Apps Script
  * 
- * バージョン: v75
- * 変更内容: カレンダー予定の表示改善と非表示機能、週単位カレンダー表示、詳細モーダル実装
+ * バージョン: v78
+ * 変更内容: 日報記入欄の振り返り項目の再設計（5つの新規項目追加、日付修正）
  * 
  * 機能:
  * - タスクの一覧表示
@@ -21,6 +21,7 @@
 const SHEET_NAME_TASKS = 'タスク';
 const SHEET_NAME_CALENDAR = 'カレンダー';
 const SHEET_NAME_REPORT = '日報';
+const SHEET_NAME_REPORT_OLD = '日報（旧）';
 
 // タスクシートの列インデックス（0始まり）
 const TASK_COL_ID = 0;
@@ -40,13 +41,19 @@ const TASK_COLUMN_COUNT = 11;
 const REPORT_COL_DATE = 0;
 const REPORT_COL_GOAL = 1;
 const REPORT_COL_ARRIVAL_HEALTH = 2;
-const REPORT_COL_DEPARTURE_HEALTH = 3;
-const REPORT_COL_COMPLETED_TASK_COUNT = 4;
-const REPORT_COL_COMPLETED_TASK_HOURS = 5;
-const REPORT_COL_REFLECTION = 6;
-const REPORT_COL_TOMORROW_PLAN = 7;
-const REPORT_COL_RECORDED_AT = 8;
-const REPORT_COLUMN_COUNT = 9;
+const REPORT_COL_ARRIVAL_HEALTH_MEMO = 3;
+const REPORT_COL_DEPARTURE_HEALTH = 4;
+const REPORT_COL_DEPARTURE_HEALTH_MEMO = 5;
+const REPORT_COL_COMPLETED_TASK_COUNT = 6;
+const REPORT_COL_COMPLETED_TASK_HOURS = 7;
+const REPORT_COL_PROGRESS = 8;
+const REPORT_COL_CHALLENGES = 9;
+const REPORT_COL_ACTIONS = 10;
+const REPORT_COL_REQUESTS = 11;
+const REPORT_COL_LEARNINGS = 12;
+const REPORT_COL_TOMORROW_PLAN = 13;
+const REPORT_COL_RECORDED_AT = 14;
+const REPORT_COLUMN_COUNT = 15;
 
 // ============================================================================
 // ユーティリティ関数
@@ -243,10 +250,16 @@ function createReportRow(date, data = {}) {
   row[REPORT_COL_DATE] = date;
   row[REPORT_COL_GOAL] = data.goal || '';
   row[REPORT_COL_ARRIVAL_HEALTH] = data.arrivalHealthScore || '';
+  row[REPORT_COL_ARRIVAL_HEALTH_MEMO] = data.arrivalHealthMemo || '';
   row[REPORT_COL_DEPARTURE_HEALTH] = data.departureHealthScore || '';
+  row[REPORT_COL_DEPARTURE_HEALTH_MEMO] = data.departureHealthMemo || '';
   row[REPORT_COL_COMPLETED_TASK_COUNT] = data.completedTaskCount || 0;
   row[REPORT_COL_COMPLETED_TASK_HOURS] = data.completedTaskHours || 0;
-  row[REPORT_COL_REFLECTION] = data.reflection || '';
+  row[REPORT_COL_PROGRESS] = data.progress || '';
+  row[REPORT_COL_CHALLENGES] = data.challenges || '';
+  row[REPORT_COL_ACTIONS] = data.actions || '';
+  row[REPORT_COL_REQUESTS] = data.requests || '';
+  row[REPORT_COL_LEARNINGS] = data.learnings || '';
   row[REPORT_COL_TOMORROW_PLAN] = data.tomorrowPlan || '';
   row[REPORT_COL_RECORDED_AT] = data.recordedAt || new Date();
   return row;
@@ -294,16 +307,30 @@ function initializeSpreadsheet() {
     tasksSheet.setFrozenRows(1);
   }
   
-  // 日報シートの作成（存在しない場合のみ）
+  // 既存の「日報」シートを「日報（旧）」に名称変更
+  const oldReportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+  if (oldReportSheet) {
+    // 「日報（旧）」が既に存在する場合はスキップ
+    const alreadyRenamed = ss.getSheetByName(SHEET_NAME_REPORT_OLD);
+    if (!alreadyRenamed) {
+      oldReportSheet.setName(SHEET_NAME_REPORT_OLD);
+    }
+  }
+  
+  // 新しい日報シートの作成（存在しない場合のみ）
   let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
+  // 列構造は後続のイシュー（Issue #15, #16）で定義されるため、
+  // 現時点では仮のヘッダーで作成（後で更新される）
   const REPORT_HEADERS = [
-    '日付', '目標', '出社時体調', '退社時体調', 
-    '完了タスク数合計', '完了タスク時間合計', '振り返り', '明日の予定', '記録日時'
+    '日付', '目標', '出社時体調', '出社時体調備考', '退社時体調', '退社時体調備考',
+    '完了タスク数合計', '完了タスク時間合計',
+    '目標に対する進捗・成果', '課題・ボトルネック', '対策・改善アクション',
+    '他者への依頼・連携事項', '業務上の気づき・学び', '明日の予定', '記録日時'
   ];
   
   if (!reportSheet) {
     reportSheet = ss.insertSheet(SHEET_NAME_REPORT);
-    const headerRange = reportSheet.getRange(1, 1, 1, REPORT_COLUMN_COUNT);
+    const headerRange = reportSheet.getRange(1, 1, 1, REPORT_HEADERS.length);
     headerRange.setValues([REPORT_HEADERS]);
     headerRange.setFontWeight('bold');
     reportSheet.setFrozenRows(1);
@@ -887,6 +914,10 @@ function includeEventInWorkload(eventId) {
 /**
  * 体調スコアを記録（出社時）
  * ヘッダーの体調ステータスボタンから呼び出される
+ * @param {Object} healthData - 体調データ
+ * @param {string} healthData.date - 日付
+ * @param {string} healthData.score - 体調スコア（「良い」「不調あり」）
+ * @param {string} healthData.memo - 体調備考
  */
 function recordHealthScore(healthData) {
   try {
@@ -898,17 +929,26 @@ function recordHealthScore(healthData) {
     }
     
     const date = healthData.date || new Date().toISOString().split('T')[0];
-    const score = healthData.score || '普通';
+    // 体調スコアは「良い」「不調あり」の2項目のみ
+    const score = healthData.score || '良い';
+    const memo = healthData.memo || '';
+    
+    // 体調スコアの値検証
+    if (score !== '良い' && score !== '不調あり') {
+      return createErrorResponse('体調スコアは「良い」または「不調あり」のみ有効です');
+    }
     
     const rowIndex = findReportRow(reportSheet, date);
     
     if (rowIndex > 0) {
       // 既存の行を更新
       reportSheet.getRange(rowIndex, REPORT_COL_ARRIVAL_HEALTH + 1).setValue(score);
+      reportSheet.getRange(rowIndex, REPORT_COL_ARRIVAL_HEALTH_MEMO + 1).setValue(memo);
     } else {
       // 新規追加
       const newRow = createReportRow(date, {
-        arrivalHealthScore: score
+        arrivalHealthScore: score,
+        arrivalHealthMemo: memo
       });
       reportSheet.appendRow(newRow);
     }
@@ -1065,10 +1105,16 @@ function recordDailyReport(reportData) {
       // 既存の行を更新
       reportSheet.getRange(rowIndex, REPORT_COL_GOAL + 1).setValue(reportData.goal || '');
       // 出社時体調は既存の値を保持（更新しない）
+      // 退社時体調と備考を更新
       reportSheet.getRange(rowIndex, REPORT_COL_DEPARTURE_HEALTH + 1).setValue(reportData.healthScore || '');
+      reportSheet.getRange(rowIndex, REPORT_COL_DEPARTURE_HEALTH_MEMO + 1).setValue(reportData.healthMemo || '');
       reportSheet.getRange(rowIndex, REPORT_COL_COMPLETED_TASK_COUNT + 1).setValue(completedTasks.count || 0);
       reportSheet.getRange(rowIndex, REPORT_COL_COMPLETED_TASK_HOURS + 1).setValue(completedTasks.totalHours || 0);
-      reportSheet.getRange(rowIndex, REPORT_COL_REFLECTION + 1).setValue(reportData.reflection || '');
+      reportSheet.getRange(rowIndex, REPORT_COL_PROGRESS + 1).setValue(reportData.progress || '');
+      reportSheet.getRange(rowIndex, REPORT_COL_CHALLENGES + 1).setValue(reportData.challenges || '');
+      reportSheet.getRange(rowIndex, REPORT_COL_ACTIONS + 1).setValue(reportData.actions || '');
+      reportSheet.getRange(rowIndex, REPORT_COL_REQUESTS + 1).setValue(reportData.requests || '');
+      reportSheet.getRange(rowIndex, REPORT_COL_LEARNINGS + 1).setValue(reportData.learnings || '');
       reportSheet.getRange(rowIndex, REPORT_COL_TOMORROW_PLAN + 1).setValue(reportData.tomorrowPlan || '');
       reportSheet.getRange(rowIndex, REPORT_COL_RECORDED_AT + 1).setValue(new Date());
     } else {
@@ -1076,10 +1122,16 @@ function recordDailyReport(reportData) {
       const newRow = createReportRow(reportData.date, {
         goal: reportData.goal || '',
         arrivalHealthScore: reportData.arrivalHealthScore || '',
+        arrivalHealthMemo: reportData.arrivalHealthMemo || '',
         departureHealthScore: reportData.healthScore || '',
+        departureHealthMemo: reportData.healthMemo || '',
         completedTaskCount: completedTasks.count || 0,
         completedTaskHours: completedTasks.totalHours || 0,
-        reflection: reportData.reflection || '',
+        progress: reportData.progress || '',
+        challenges: reportData.challenges || '',
+        actions: reportData.actions || '',
+        requests: reportData.requests || '',
+        learnings: reportData.learnings || '',
         tomorrowPlan: reportData.tomorrowPlan || ''
       });
       reportSheet.appendRow(newRow);
@@ -1107,10 +1159,16 @@ function getDailyReport(date) {
         date: date,
         goal: '',
         arrivalHealthScore: '',
+        arrivalHealthMemo: '',
         healthScore: '',
+        healthMemo: '',
         completedTaskCount: 0,
         completedTaskHours: 0,
-        reflection: '',
+        progress: '',
+        challenges: '',
+        actions: '',
+        requests: '',
+        learnings: '',
         tomorrowPlan: ''
       };
     }
@@ -1126,10 +1184,16 @@ function getDailyReport(date) {
         date: date,
         goal: row[REPORT_COL_GOAL] || '',
         arrivalHealthScore: row[REPORT_COL_ARRIVAL_HEALTH] || '',
+        arrivalHealthMemo: row[REPORT_COL_ARRIVAL_HEALTH_MEMO] || '',
         healthScore: row[REPORT_COL_DEPARTURE_HEALTH] || '',
+        healthMemo: row[REPORT_COL_DEPARTURE_HEALTH_MEMO] || '',
         completedTaskCount: row[REPORT_COL_COMPLETED_TASK_COUNT] || 0,
         completedTaskHours: row[REPORT_COL_COMPLETED_TASK_HOURS] || 0,
-        reflection: row[REPORT_COL_REFLECTION] || '',
+        progress: row[REPORT_COL_PROGRESS] || '',
+        challenges: row[REPORT_COL_CHALLENGES] || '',
+        actions: row[REPORT_COL_ACTIONS] || '',
+        requests: row[REPORT_COL_REQUESTS] || '',
+        learnings: row[REPORT_COL_LEARNINGS] || '',
         tomorrowPlan: row[REPORT_COL_TOMORROW_PLAN] || ''
       };
     }
@@ -1140,10 +1204,16 @@ function getDailyReport(date) {
       date: date,
       goal: '',
       arrivalHealthScore: '',
+      arrivalHealthMemo: '',
       healthScore: '',
+      healthMemo: '',
       completedTaskCount: 0,
       completedTaskHours: 0,
-      reflection: '',
+      progress: '',
+      challenges: '',
+      actions: '',
+      requests: '',
+      learnings: '',
       tomorrowPlan: ''
     };
   } catch (error) {

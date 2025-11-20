@@ -87,23 +87,46 @@
     
     .health-status-wrapper {
       display: flex;
-      gap: 8px;
+      flex-direction: row;
+      gap: 10px;
       align-items: center;
     }
     
     .health-status-wrapper .health-status-buttons {
-      flex: 1;
       display: flex;
       gap: 8px;
+      flex-shrink: 0;
     }
     
     .health-status-wrapper .health-status-btn {
-      flex: 0 0 30%;
+      flex: 0 0 auto;
+      min-width: 80px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .health-memo-wrapper {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .health-memo-wrapper input {
+      width: 100%;
+      height: 40px;
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      box-sizing: border-box;
     }
     
     .health-status-wrapper .btn-small {
-      flex: 0 0 10%;
+      flex-shrink: 0;
+      height: 40px;
       margin-top: 0;
+      align-self: center;
     }
     
     .header-item label {
@@ -1486,8 +1509,10 @@
           <div class="health-status-wrapper">
             <div class="health-status-buttons">
               <button type="button" class="health-status-btn good" data-score="良い" onclick="setHealthStatus('良い', this)">良い</button>
-              <button type="button" class="health-status-btn" data-score="普通" onclick="setHealthStatus('普通', this)">普通</button>
-              <button type="button" class="health-status-btn bad" data-score="良くない" onclick="setHealthStatus('良くない', this)">良くない</button>
+              <button type="button" class="health-status-btn bad" data-score="不調あり" onclick="setHealthStatus('不調あり', this)">不調あり</button>
+            </div>
+            <div class="health-memo-wrapper">
+              <input type="text" id="health-memo" placeholder="体調の備考（例: 頭痛、腹痛など）">
             </div>
             <button type="button" id="save-goal-btn" class="btn btn-primary btn-small">保存</button>
           </div>
@@ -1617,16 +1642,18 @@
         </div>
         <div class="form-group">
           <label for="report-goal">今日の目標</label>
-          <input type="text" id="report-goal" name="goal" placeholder="今日の目標を入力してください">
+          <textarea id="report-goal" name="goal" rows="3" placeholder="今日の目標を入力してください（複数の場合は改行で区切ってください）"></textarea>
         </div>
         <div class="form-group">
           <label>体調スコア</label>
           <div class="health-score-buttons">
             <button type="button" class="health-score-btn good" data-score="良い" onclick="selectReportHealthScore('良い', this)">良い</button>
-            <button type="button" class="health-score-btn" data-score="普通" onclick="selectReportHealthScore('普通', this)">普通</button>
-            <button type="button" class="health-score-btn bad" data-score="良くない" onclick="selectReportHealthScore('良くない', this)">良くない</button>
+            <button type="button" class="health-score-btn bad" data-score="不調あり" onclick="selectReportHealthScore('不調あり', this)">不調あり</button>
           </div>
           <input type="hidden" id="report-health-score" name="healthScore">
+          <div style="margin-top: 8px;">
+            <input type="text" id="report-health-memo" name="healthMemo" placeholder="体調の備考（例: 頭痛、腹痛など）" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem;">
+          </div>
           <small style="color: #666; font-size: 0.85rem; display: block; margin-top: 5px;">※ 出社時体調はヘッダーの「現在の体調」ボタンで記録してください</small>
         </div>
         <div class="form-group">
@@ -1636,8 +1663,24 @@
           </div>
         </div>
         <div class="form-group">
-          <label for="report-reflection">今日の振り返り</label>
-          <textarea id="report-reflection" name="reflection" rows="4" placeholder="今日の振り返りを入力してください"></textarea>
+          <label for="report-progress">目標に対する進捗・成果 <span style="color: red;">*</span></label>
+          <textarea id="report-progress" name="progress" rows="6" placeholder="今日取り組んだ目標に対し、具体的な成果や進捗率（例: 80%完了）を記入してください。" required></textarea>
+        </div>
+        <div class="form-group">
+          <label for="report-challenges">課題・ボトルネック <span style="color: red;">*</span></label>
+          <textarea id="report-challenges" name="challenges" rows="6" placeholder="目標達成やタスク完了を妨げた具体的な問題点や、つまずいた要因を記入してください。" required></textarea>
+        </div>
+        <div class="form-group">
+          <label for="report-actions">対策・改善アクション <span style="color: red;">*</span></label>
+          <textarea id="report-actions" name="actions" rows="6" placeholder="課題に対して、明日以降に取る具体的な解決策や改善行動を記入してください。" required></textarea>
+        </div>
+        <div class="form-group">
+          <label for="report-requests">他者への依頼・連携事項</label>
+          <textarea id="report-requests" name="requests" rows="4" placeholder="自分の業務を進める上で、上司、同僚、他部署に依頼・確認が必要な事項を記入してください。"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="report-learnings">業務上の気づき・学び</label>
+          <textarea id="report-learnings" name="learnings" rows="4" placeholder="新しい知見、効率化のヒント、業務を通じて得た学びを自由に記入してください。"></textarea>
         </div>
         <div class="form-group">
           <label for="report-tomorrow-plan">明日の予定（任意）</label>
@@ -1838,8 +1881,11 @@
       // その後にタスク関連のデータを読み込む
       loadData();
       
-      // 日報フォームの日付を今日に設定
-      const today = new Date().toISOString().split('T')[0];
+      // 日報フォームの日付を今日に設定（日本時間で当日の日付を取得）
+      const now = new Date();
+      const jstOffset = 9 * 60; // JSTはUTC+9
+      const jstDate = new Date(now.getTime() + (jstOffset + now.getTimezoneOffset()) * 60000);
+      const today = jstDate.toISOString().split('T')[0];
       const reportDateInput = document.getElementById('report-date');
       if (reportDateInput) {
         reportDateInput.value = today;
@@ -1949,10 +1995,11 @@
       
       // 体調を記録（ローディング表示なしで静かに記録）
       const today = new Date().toISOString().split('T')[0];
+      const memoInput = document.getElementById('health-memo');
       const healthData = {
         date: today,
         score: score,
-        memo: ''
+        memo: memoInput ? memoInput.value : ''
       };
       
       google.script.run
@@ -1988,6 +2035,11 @@
               });
               button.classList.add('selected');
               console.log('loadTodayHealth: 体調ボタンを選択:', report.arrivalHealthScore);
+            }
+            // 備考欄を設定
+            const memoInput = document.getElementById('health-memo');
+            if (memoInput && report.arrivalHealthMemo) {
+              memoInput.value = report.arrivalHealthMemo;
             }
           } else {
             console.log('loadTodayHealth: 体調データなしまたはエラー');
@@ -3276,11 +3328,37 @@
         return;
       }
       
+      // 必須項目のバリデーション
+      const progress = document.getElementById('report-progress').value.trim();
+      const challenges = document.getElementById('report-challenges').value.trim();
+      const actions = document.getElementById('report-actions').value.trim();
+      
+      if (!progress) {
+        alert('「目標に対する進捗・成果」は必須項目です。');
+        document.getElementById('report-progress').focus();
+        return;
+      }
+      if (!challenges) {
+        alert('「課題・ボトルネック」は必須項目です。');
+        document.getElementById('report-challenges').focus();
+        return;
+      }
+      if (!actions) {
+        alert('「対策・改善アクション」は必須項目です。');
+        document.getElementById('report-actions').focus();
+        return;
+      }
+      
       const reportData = {
         date: date,
         goal: document.getElementById('report-goal').value,
         healthScore: document.getElementById('report-health-score').value,
-        reflection: document.getElementById('report-reflection').value,
+        healthMemo: document.getElementById('report-health-memo') ? document.getElementById('report-health-memo').value : '',
+        progress: progress,
+        challenges: challenges,
+        actions: actions,
+        requests: document.getElementById('report-requests').value.trim(),
+        learnings: document.getElementById('report-learnings').value.trim(),
         tomorrowPlan: document.getElementById('report-tomorrow-plan').value
       };
       
@@ -3327,7 +3405,11 @@
             
             // フォームにデータを設定
             document.getElementById('report-goal').value = report.goal || '';
-            document.getElementById('report-reflection').value = report.reflection || '';
+            document.getElementById('report-progress').value = report.progress || '';
+            document.getElementById('report-challenges').value = report.challenges || '';
+            document.getElementById('report-actions').value = report.actions || '';
+            document.getElementById('report-requests').value = report.requests || '';
+            document.getElementById('report-learnings').value = report.learnings || '';
             document.getElementById('report-tomorrow-plan').value = report.tomorrowPlan || '';
             
             // 退社時体調スコアを設定（日報フォーム内）
@@ -3336,6 +3418,11 @@
               if (button) {
                 selectReportHealthScore(report.healthScore, button);
               }
+            }
+            // 退社時体調備考を設定
+            const healthMemoInput = document.getElementById('report-health-memo');
+            if (healthMemoInput && report.healthMemo) {
+              healthMemoInput.value = report.healthMemo;
             }
           })
           .withFailureHandler(function(error) {
