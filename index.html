@@ -620,19 +620,19 @@
       color: #999;
     }
     
-    .task-item.priority-high {
+    .task-item.area-urgent {
       border-left-color: #e74c3c;
       background: linear-gradient(to right, #fff5f5 0%, white 8%);
     }
     
-    .task-item.priority-medium {
+    .task-item.area-stack {
       border-left-color: #f39c12;
       background: linear-gradient(to right, #fffbf0 0%, white 8%);
     }
     
-    .task-item.priority-low {
-      border-left-color: #27ae60;
-      background: linear-gradient(to right, #f0fff4 0%, white 8%);
+    .task-item.area-planned {
+      border-left-color: #3498db;
+      background: linear-gradient(to right, #e3f2fd 0%, white 8%);
     }
     
     .task-header-row {
@@ -698,39 +698,24 @@
       line-height: 1.2;
     }
     
-    .badge-priority-high {
+    .badge-area-urgent {
       background: #fee;
       color: #e74c3c;
     }
     
-    .badge-priority-medium {
+    .badge-area-stack {
       background: #fff4e6;
       color: #f39c12;
     }
     
-    .badge-priority-low {
-      background: #e8f5e9;
-      color: #27ae60;
+    .badge-area-planned {
+      background: #e3f2fd;
+      color: #3498db;
     }
     
     .badge-hours {
       background: #e3f2fd;
       color: #1976d2;
-    }
-    
-    .badge-importance-high {
-      background: #fce4ec;
-      color: #c2185b;
-    }
-    
-    .badge-importance-medium {
-      background: #fff9c4;
-      color: #f57f17;
-    }
-    
-    .badge-importance-low {
-      background: #e0f2f1;
-      color: #00695c;
     }
     
     .badge-deliverable {
@@ -1550,15 +1535,14 @@
           </div>
           
           <div class="form-group">
-            <label for="task-matrix">タスクの優先度・重要度</label>
-            <select id="task-matrix" name="matrix">
-              <option value="高優先/高重要">高優先/高重要（最優先）</option>
-              <option value="高優先/低重要">高優先/低重要（急いで対応）</option>
-              <option value="低優先/高重要" selected>低優先/高重要（計画的に実行）</option>
-              <option value="低優先/低重要">低優先/低重要（後回し可）</option>
+            <label for="task-area">領域</label>
+            <select id="task-area" name="area">
+              <option value="今すぐやる" selected>今すぐやる</option>
+              <option value="スタックする">スタックする</option>
+              <option value="計画的にする">計画的にする</option>
             </select>
             <small style="color: #666; font-size: 0.8rem; margin-top: 4px; display: block;">
-              優先度：いつまでにやるか / 重要度：成果の大きさ
+              タスクを分類する領域を選択してください
             </small>
           </div>
           
@@ -1583,9 +1567,8 @@
             <div class="sort-controls">
               <label for="task-sort">並び替え:</label>
               <select id="task-sort" class="task-sort-select">
-                <option value="priority">優先度</option>
+                <option value="area">領域</option>
                 <option value="deadline">締切日</option>
-                <option value="importance">重要度</option>
                 <option value="estimatedHours">見積もり時間</option>
                 <option value="status">ステータス</option>
                 <option value="createdAt">作成日時</option>
@@ -1713,15 +1696,14 @@
           <input type="number" id="edit-task-hours" step="0.5" min="0" required>
         </div>
         <div class="form-group">
-          <label for="edit-task-matrix">タスクの優先度・重要度</label>
-          <select id="edit-task-matrix">
-            <option value="高優先/高重要">高優先/高重要（最優先）</option>
-            <option value="高優先/低重要">高優先/低重要（急いで対応）</option>
-            <option value="低優先/高重要">低優先/高重要（計画的に実行）</option>
-            <option value="低優先/低重要">低優先/低重要（後回し可）</option>
+          <label for="edit-task-area">領域</label>
+          <select id="edit-task-area">
+            <option value="今すぐやる">今すぐやる</option>
+            <option value="スタックする">スタックする</option>
+            <option value="計画的にする">計画的にする</option>
           </select>
           <small style="color: #666; font-size: 0.8rem; margin-top: 4px; display: block;">
-            優先度：いつまでにやるか / 重要度：成果の大きさ
+            タスクを分類する領域を選択してください
           </small>
         </div>
         <div class="form-group">
@@ -2060,7 +2042,7 @@
     
     // タスク一覧の状態管理
     let allTasks = [];
-    let currentSortBy = 'priority';
+    let currentSortBy = 'area';
     let currentSortOrder = 'desc'; // 'asc' or 'desc'
     let showCompleted = false; // デフォルトで完了タスクを非表示
     
@@ -2218,20 +2200,13 @@
         let aVal2, bVal2; // 2次ソート用
         
         switch(sortBy) {
-          case 'priority':
-            // 優先度 → 重要度 → 締切日 の順でソート
-            const priorityOrder = { '高': 3, '中': 2, '低': 1 };
-            aVal = priorityOrder[a.priority] || 0;
-            bVal = priorityOrder[b.priority] || 0;
-            // 同じ優先度の場合、重要度で比較
+          case 'area':
+            // 領域 → 締切日 の順でソート
+            const areaOrder = { '今すぐやる': 3, 'スタックする': 2, '計画的にする': 1 };
+            aVal = areaOrder[a.area] || 0;
+            bVal = areaOrder[b.area] || 0;
+            // 同じ領域の場合、締切日で比較
             if (aVal === bVal) {
-              const importanceOrder = { '高': 3, '中': 2, '低': 1 };
-              aVal2 = importanceOrder[a.importance] || 0;
-              bVal2 = importanceOrder[b.importance] || 0;
-              if (aVal2 !== bVal2) {
-                return sortOrder === 'asc' ? aVal2 - bVal2 : bVal2 - aVal2;
-              }
-              // 同じ重要度の場合、締切日で比較
               if (a.deadline && b.deadline) {
                 aVal2 = new Date(a.deadline).getTime();
                 bVal2 = new Date(b.deadline).getTime();
@@ -2242,64 +2217,34 @@
             }
             break;
           case 'deadline':
-            // 締切日 → 優先度 → 重要度 の順でソート
+            // 締切日 → 領域 の順でソート
             if (!a.deadline && !b.deadline) {
-              // 両方締切日がない場合、優先度で比較
-              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
-              aVal = priorityOrder[a.priority] || 0;
-              bVal = priorityOrder[b.priority] || 0;
-              if (aVal !== bVal) {
-                return sortOrder === 'asc' ? bVal - aVal : aVal - bVal;
-              }
-              // 同じ優先度の場合、重要度で比較
-              const importanceOrder = { '高': 3, '中': 2, '低': 1 };
-              aVal2 = importanceOrder[a.importance] || 0;
-              bVal2 = importanceOrder[b.importance] || 0;
-              return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
+              // 両方締切日がない場合、領域で比較
+              const areaOrder = { '今すぐやる': 3, 'スタックする': 2, '計画的にする': 1 };
+              aVal = areaOrder[a.area] || 0;
+              bVal = areaOrder[b.area] || 0;
+              return sortOrder === 'asc' ? bVal - aVal : aVal - bVal;
             }
             if (!a.deadline) return 1; // 締切日がないものは後ろに
             if (!b.deadline) return -1;
             aVal = new Date(a.deadline).getTime();
             bVal = new Date(b.deadline).getTime();
-            // 同じ締切日の場合、優先度で比較
+            // 同じ締切日の場合、領域で比較
             if (aVal === bVal) {
-              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
-              aVal2 = priorityOrder[a.priority] || 0;
-              bVal2 = priorityOrder[b.priority] || 0;
-              return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
-            }
-            break;
-          case 'importance':
-            // 重要度 → 優先度 → 締切日 の順でソート
-            const importanceOrder = { '高': 3, '中': 2, '低': 1 };
-            aVal = importanceOrder[a.importance] || 0;
-            bVal = importanceOrder[b.importance] || 0;
-            // 同じ重要度の場合、優先度で比較
-            if (aVal === bVal) {
-              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
-              aVal2 = priorityOrder[a.priority] || 0;
-              bVal2 = priorityOrder[b.priority] || 0;
-              if (aVal2 !== bVal2) {
-                return sortOrder === 'asc' ? aVal2 - bVal2 : bVal2 - aVal2;
-              }
-              // 同じ優先度の場合、締切日で比較
-              if (a.deadline && b.deadline) {
-                aVal2 = new Date(a.deadline).getTime();
-                bVal2 = new Date(b.deadline).getTime();
-                return sortOrder === 'asc' ? aVal2 - bVal2 : bVal2 - aVal2;
-              }
-              if (!a.deadline && b.deadline) return 1;
-              if (a.deadline && !b.deadline) return -1;
+              const areaOrder = { '今すぐやる': 3, 'スタックする': 2, '計画的にする': 1 };
+              aVal2 = areaOrder[a.area] || 0;
+              bVal2 = areaOrder[b.area] || 0;
+              return sortOrder === 'asc' ? aVal2 - bVal2 : bVal2 - aVal2;
             }
             break;
           case 'estimatedHours':
             aVal = parseFloat(a.estimatedHours) || 0;
             bVal = parseFloat(b.estimatedHours) || 0;
-            // 同じ時間の場合、優先度で比較
+            // 同じ時間の場合、領域で比較
             if (aVal === bVal) {
-              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
-              aVal2 = priorityOrder[a.priority] || 0;
-              bVal2 = priorityOrder[b.priority] || 0;
+              const areaOrder = { '今すぐやる': 3, 'スタックする': 2, '計画的にする': 1 };
+              aVal2 = areaOrder[a.area] || 0;
+              bVal2 = areaOrder[b.area] || 0;
               return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
             }
             break;
@@ -2308,44 +2253,44 @@
             const statusOrder = { '未着手': 4, '進行中': 3, '完了': 2, 'キャンセル': 1 };
             aVal = statusOrder[a.status] || 0;
             bVal = statusOrder[b.status] || 0;
-            // 同じステータスの場合、優先度で比較
+            // 同じステータスの場合、領域で比較
             if (aVal === bVal) {
-              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
-              aVal2 = priorityOrder[a.priority] || 0;
-              bVal2 = priorityOrder[b.priority] || 0;
+              const areaOrder = { '今すぐやる': 3, 'スタックする': 2, '計画的にする': 1 };
+              aVal2 = areaOrder[a.area] || 0;
+              bVal2 = areaOrder[b.area] || 0;
               return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
             }
             break;
           case 'createdAt':
             aVal = a.createdAt ? new Date(a.createdAt).getTime() : 0;
             bVal = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-            // 同じ作成日時の場合、優先度で比較
+            // 同じ作成日時の場合、領域で比較
             if (aVal === bVal) {
-              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
-              aVal2 = priorityOrder[a.priority] || 0;
-              bVal2 = priorityOrder[b.priority] || 0;
+              const areaOrder = { '今すぐやる': 3, 'スタックする': 2, '計画的にする': 1 };
+              aVal2 = areaOrder[a.area] || 0;
+              bVal2 = areaOrder[b.area] || 0;
               return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
             }
             break;
           case 'updatedAt':
             aVal = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
             bVal = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-            // 同じ更新日時の場合、優先度で比較
+            // 同じ更新日時の場合、領域で比較
             if (aVal === bVal) {
-              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
-              aVal2 = priorityOrder[a.priority] || 0;
-              bVal2 = priorityOrder[b.priority] || 0;
+              const areaOrder = { '今すぐやる': 3, 'スタックする': 2, '計画的にする': 1 };
+              aVal2 = areaOrder[a.area] || 0;
+              bVal2 = areaOrder[b.area] || 0;
               return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
             }
             break;
           case 'title':
             aVal = (a.title || '').toLowerCase();
             bVal = (b.title || '').toLowerCase();
-            // 同じタイトルの場合、優先度で比較
+            // 同じタイトルの場合、領域で比較
             if (aVal === bVal) {
-              const priorityOrder = { '高': 3, '中': 2, '低': 1 };
-              aVal2 = priorityOrder[a.priority] || 0;
-              bVal2 = priorityOrder[b.priority] || 0;
+              const areaOrder = { '今すぐやる': 3, 'スタックする': 2, '計画的にする': 1 };
+              aVal2 = areaOrder[a.area] || 0;
+              bVal2 = areaOrder[b.area] || 0;
               return sortOrder === 'asc' ? bVal2 - aVal2 : aVal2 - bVal2;
             }
             break;
@@ -2438,9 +2383,9 @@
       
       let html = '';
       tasks.forEach(task => {
-        const priorityClass = `priority-${task.priority === '高' ? 'high' : task.priority === '中' ? 'medium' : 'low'}`;
-        const badgeClass = `badge-priority-${task.priority === '高' ? 'high' : task.priority === '中' ? 'medium' : 'low'}`;
-        const importanceBadgeClass = `badge-importance-${task.importance === '高' ? 'high' : task.importance === '中' ? 'medium' : 'low'}`;
+        const area = task.area || '今すぐやる';
+        const areaClass = `area-${area === '今すぐやる' ? 'urgent' : area === 'スタックする' ? 'stack' : 'planned'}`;
+        const areaBadgeClass = `badge-area-${area === '今すぐやる' ? 'urgent' : area === 'スタックする' ? 'stack' : 'planned'}`;
         const statusClass = `badge-status-${task.status === '完了' ? 'completed' : task.status === '進行中' ? 'in-progress' : task.status === 'キャンセル' ? 'cancelled' : 'pending'}`;
         const isCompleted = task.status === '完了';
         
@@ -2460,7 +2405,7 @@
         }
         
         html += `
-          <div class="task-item ${priorityClass} ${isCompleted ? 'completed' : ''}" data-task-id="${task.id}">
+          <div class="task-item ${areaClass} ${isCompleted ? 'completed' : ''}" data-task-id="${task.id}">
             <div class="task-header-row">
               <div class="task-title-main">${escapeHtml(task.title)}</div>
               <div class="task-header-actions">
@@ -2480,8 +2425,7 @@
                 ${task.deadline ? `<span class="badge badge-deadline ${deadlineClass}">📅 締切: ${formatDate(task.deadline)}</span>` : ''}
               </div>
               <div class="task-info-row-second">
-                <span class="badge ${badgeClass}">優先度：${escapeHtml(task.priority)}</span>
-                <span class="badge ${importanceBadgeClass}">重要度：${escapeHtml(task.importance || '中')}</span>
+                <span class="badge ${areaBadgeClass}">領域：${escapeHtml(area)}</span>
                 <span class="badge badge-hours">想定時間：${task.estimatedHours}時間</span>
               </div>
             </div>
@@ -2892,22 +2836,6 @@
       displayWeekCalendar(data);
     };
     
-    // マトリクス値を優先度・重要度に変換
-    function parseMatrixValue(matrixValue) {
-      const matrixMap = {
-        '高優先/高重要': { priority: '高', importance: '高' },
-        '高優先/低重要': { priority: '高', importance: '低' },
-        '低優先/高重要': { priority: '低', importance: '高' },
-        '低優先/低重要': { priority: '低', importance: '低' },
-        // 後方互換性のため、旧形式もサポート
-        '高緊急/高重要': { priority: '高', importance: '高' },
-        '高緊急/低重要': { priority: '高', importance: '低' },
-        '低緊急/高重要': { priority: '低', importance: '高' },
-        '低緊急/低重要': { priority: '低', importance: '低' }
-      };
-      return matrixMap[matrixValue] || { priority: '中', importance: '中' };
-    }
-    
     // タスク追加フォームの処理
     document.getElementById('task-form').addEventListener('submit', function(e) {
       e.preventDefault();
@@ -2915,16 +2843,11 @@
       const form = this;
       const submitButton = form.querySelector('button[type="submit"]');
       
-      // マトリクス値を優先度・重要度に変換
-      const matrixValue = document.getElementById('task-matrix').value;
-      const { priority, importance } = parseMatrixValue(matrixValue);
-      
       const formData = {
         title: document.getElementById('task-title').value,
         description: document.getElementById('task-description').value,
         estimatedHours: document.getElementById('task-hours').value,
-        priority: priority,
-        importance: importance,
+        area: document.getElementById('task-area').value,
         deliverable: document.getElementById('task-deliverable').value,
         deadline: document.getElementById('task-deadline').value,
         status: '未着手'
@@ -3097,20 +3020,9 @@
             document.getElementById('edit-task-description').value = task.description || '';
             document.getElementById('edit-task-hours').value = task.estimatedHours;
             
-            // 優先度・重要度からマトリクス値を計算
-            const priority = task.priority || '中';
-            const importance = task.importance || '中';
-            let matrixValue = '';
-            if (priority === '高' && importance === '高') {
-              matrixValue = '高優先/高重要';
-            } else if (priority === '高' && importance === '低') {
-              matrixValue = '高優先/低重要';
-            } else if (priority === '低' && importance === '高') {
-              matrixValue = '低優先/高重要';
-            } else {
-              matrixValue = '低優先/低重要';
-            }
-            document.getElementById('edit-task-matrix').value = matrixValue;
+            // 領域を設定
+            const area = task.area || '今すぐやる';
+            document.getElementById('edit-task-area').value = area;
             
             document.getElementById('edit-task-deliverable').value = task.deliverable || '';
             // 締切日を設定（ISO形式に変換）
@@ -3148,15 +3060,11 @@
       const taskId = document.getElementById('edit-task-id').value;
       
       // マトリクス値を優先度・重要度に変換
-      const matrixValue = document.getElementById('edit-task-matrix').value;
-      const { priority, importance } = parseMatrixValue(matrixValue);
-      
       const taskData = {
         title: document.getElementById('edit-task-title').value,
         description: document.getElementById('edit-task-description').value,
         estimatedHours: document.getElementById('edit-task-hours').value,
-        priority: priority,
-        importance: importance,
+        area: document.getElementById('edit-task-area').value,
         deliverable: document.getElementById('edit-task-deliverable').value,
         deadline: document.getElementById('edit-task-deadline').value
       };

@@ -1,8 +1,8 @@
 /**
  * タスク管理ポータル - Google Apps Script
  * 
- * バージョン: v78
- * 変更内容: 日報記入欄の振り返り項目の再設計（5つの新規項目追加、日付修正）
+ * バージョン: v79
+ * 変更内容: タスクの領域分け機能の実装（優先度・重要度の廃止、3領域での管理）
  * 
  * 機能:
  * - タスクの一覧表示
@@ -19,6 +19,7 @@
 
 // スプレッドシートの設定
 const SHEET_NAME_TASKS = 'タスク';
+const SHEET_NAME_TASKS_OLD = 'タスク（旧）';
 const SHEET_NAME_CALENDAR = 'カレンダー';
 const SHEET_NAME_REPORT = '日報';
 const SHEET_NAME_REPORT_OLD = '日報（旧）';
@@ -28,14 +29,13 @@ const TASK_COL_ID = 0;
 const TASK_COL_TITLE = 1;
 const TASK_COL_DESCRIPTION = 2;
 const TASK_COL_ESTIMATED_HOURS = 3;
-const TASK_COL_PRIORITY = 4;
-const TASK_COL_IMPORTANCE = 5;
-const TASK_COL_DELIVERABLE = 6;
-const TASK_COL_DEADLINE = 7;
-const TASK_COL_STATUS = 8;
-const TASK_COL_CREATED_AT = 9;
-const TASK_COL_UPDATED_AT = 10;
-const TASK_COLUMN_COUNT = 11;
+const TASK_COL_AREA = 4;
+const TASK_COL_DELIVERABLE = 5;
+const TASK_COL_DEADLINE = 6;
+const TASK_COL_STATUS = 7;
+const TASK_COL_CREATED_AT = 8;
+const TASK_COL_UPDATED_AT = 9;
+const TASK_COLUMN_COUNT = 10;
 
 // 日報シートの列インデックス（0始まり）
 const REPORT_COL_DATE = 0;
@@ -287,54 +287,82 @@ function include(filename) {
 }
 
 /**
+ * 既存シートを旧シートに名称変更（タイムスタンプ付きで競合回避）
+ * @param {Spreadsheet} ss - スプレッドシートオブジェクト
+ * @param {string} sheetName - シート名
+ * @param {string} oldSheetName - 旧シート名
+ */
+function renameSheetToOld(ss, sheetName, oldSheetName) {
+  const oldSheet = ss.getSheetByName(sheetName);
+  if (!oldSheet) {
+    return;
+  }
+  
+  const alreadyRenamed = ss.getSheetByName(oldSheetName);
+  if (!alreadyRenamed) {
+    oldSheet.setName(oldSheetName);
+    Logger.log(`既存のシート「${sheetName}」を「${oldSheetName}」に名称変更しました。`);
+  } else {
+    const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+    const oldSheetNameWithTimestamp = `${oldSheetName}_${timestamp}`;
+    oldSheet.setName(oldSheetNameWithTimestamp);
+    Logger.log(`既存のシート「${sheetName}」を「${oldSheetNameWithTimestamp}」に名称変更しました（「${oldSheetName}」は既に存在します）。`);
+  }
+}
+
+/**
+ * シートを作成または更新（ヘッダーを最新に保つ）
+ * @param {Spreadsheet} ss - スプレッドシートオブジェクト
+ * @param {string} sheetName - シート名
+ * @param {Array<string>} headers - ヘッダー配列
+ * @param {number} columnCount - 列数
+ */
+function createOrUpdateSheet(ss, sheetName, headers, columnCount) {
+  let sheet = ss.getSheetByName(sheetName);
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    const headerRange = sheet.getRange(1, 1, 1, columnCount);
+    headerRange.setValues([headers]);
+    headerRange.setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    Logger.log(`新しいシート「${sheetName}」を作成しました。`);
+  } else {
+    const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (JSON.stringify(currentHeaders) !== JSON.stringify(headers)) {
+      sheet.getRange(1, 1, 1, columnCount).setValues([headers]);
+      sheet.getRange(1, 1, 1, columnCount).setFontWeight('bold');
+      sheet.setFrozenRows(1);
+      Logger.log(`既存のシート「${sheetName}」のヘッダーを更新しました。`);
+    }
+  }
+  
+  return sheet;
+}
+
+/**
  * スプレッドシートを初期化（初回実行時のみ）
  */
 function initializeSpreadsheet() {
   const ss = getSpreadsheet();
   
-  // タスクシートの作成（存在しない場合のみ）
-  let tasksSheet = ss.getSheetByName(SHEET_NAME_TASKS);
+  // タスクシートの初期化
+  renameSheetToOld(ss, SHEET_NAME_TASKS, SHEET_NAME_TASKS_OLD);
   const TASK_HEADERS = [
-    'ID', 'タイトル', '説明', '見積もり時間（時間）', '優先度', 
-    '重要度', '提出先', '締切日', 'ステータス', '作成日時', '更新日時'
+    'ID', 'タイトル', '説明', '見積もり時間（時間）', '領域', 
+    '提出先', '締切日', 'ステータス', '作成日時', '更新日時'
   ];
+  createOrUpdateSheet(ss, SHEET_NAME_TASKS, TASK_HEADERS, TASK_COLUMN_COUNT);
   
-  if (!tasksSheet) {
-    tasksSheet = ss.insertSheet(SHEET_NAME_TASKS);
-    const headerRange = tasksSheet.getRange(1, 1, 1, TASK_COLUMN_COUNT);
-    headerRange.setValues([TASK_HEADERS]);
-    headerRange.setFontWeight('bold');
-    tasksSheet.setFrozenRows(1);
-  }
-  
-  // 既存の「日報」シートを「日報（旧）」に名称変更
-  const oldReportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
-  if (oldReportSheet) {
-    // 「日報（旧）」が既に存在する場合はスキップ
-    const alreadyRenamed = ss.getSheetByName(SHEET_NAME_REPORT_OLD);
-    if (!alreadyRenamed) {
-      oldReportSheet.setName(SHEET_NAME_REPORT_OLD);
-    }
-  }
-  
-  // 新しい日報シートの作成（存在しない場合のみ）
-  let reportSheet = ss.getSheetByName(SHEET_NAME_REPORT);
-  // 列構造は後続のイシュー（Issue #15, #16）で定義されるため、
-  // 現時点では仮のヘッダーで作成（後で更新される）
+  // 日報シートの初期化
+  renameSheetToOld(ss, SHEET_NAME_REPORT, SHEET_NAME_REPORT_OLD);
   const REPORT_HEADERS = [
     '日付', '目標', '出社時体調', '出社時体調備考', '退社時体調', '退社時体調備考',
     '完了タスク数合計', '完了タスク時間合計',
     '目標に対する進捗・成果', '課題・ボトルネック', '対策・改善アクション',
     '他者への依頼・連携事項', '業務上の気づき・学び', '明日の予定', '記録日時'
   ];
-  
-  if (!reportSheet) {
-    reportSheet = ss.insertSheet(SHEET_NAME_REPORT);
-    const headerRange = reportSheet.getRange(1, 1, 1, REPORT_HEADERS.length);
-    headerRange.setValues([REPORT_HEADERS]);
-    headerRange.setFontWeight('bold');
-    reportSheet.setFrozenRows(1);
-  }
+  createOrUpdateSheet(ss, SHEET_NAME_REPORT, REPORT_HEADERS, REPORT_COLUMN_COUNT);
   
   return createSuccessResponse('スプレッドシートが初期化されました');
 }
@@ -443,8 +471,7 @@ function debugGetTasks() {
           title: row[TASK_COL_TITLE] || '',
           description: row[TASK_COL_DESCRIPTION] || '',
           estimatedHours: row[TASK_COL_ESTIMATED_HOURS] || 0,
-          priority: row[TASK_COL_PRIORITY] || '中',
-          importance: row[TASK_COL_IMPORTANCE] || '中',
+          area: row[TASK_COL_AREA] || '今すぐやる',
           deliverable: row[TASK_COL_DELIVERABLE] || '',
           deadline: row[TASK_COL_DEADLINE] || '',
           status: row[TASK_COL_STATUS] || '未着手',
@@ -512,8 +539,7 @@ function getTasks() {
           title: row[TASK_COL_TITLE] || '',
           description: row[TASK_COL_DESCRIPTION] || '',
           estimatedHours: row[TASK_COL_ESTIMATED_HOURS] || 0,
-          priority: row[TASK_COL_PRIORITY] || '中',
-          importance: row[TASK_COL_IMPORTANCE] || '中',
+          area: row[TASK_COL_AREA] || '今すぐやる',
           deliverable: row[TASK_COL_DELIVERABLE] || '',
           deadline: row[TASK_COL_DEADLINE] || '',
           status: row[TASK_COL_STATUS] || '未着手',
@@ -560,8 +586,7 @@ function addTask(taskData) {
     newRow[TASK_COL_TITLE] = taskData.title || '';
     newRow[TASK_COL_DESCRIPTION] = taskData.description || '';
     newRow[TASK_COL_ESTIMATED_HOURS] = parseFloat(taskData.estimatedHours) || 0;
-    newRow[TASK_COL_PRIORITY] = taskData.priority || '中';
-    newRow[TASK_COL_IMPORTANCE] = taskData.importance || '中';
+    newRow[TASK_COL_AREA] = taskData.area || '今すぐやる';
     newRow[TASK_COL_DELIVERABLE] = taskData.deliverable || '';
     newRow[TASK_COL_DEADLINE] = taskData.deadline || '';
     newRow[TASK_COL_STATUS] = taskData.status || '未着手';
@@ -614,8 +639,7 @@ function updateTask(taskId, taskData) {
     updatedRow[TASK_COL_TITLE] = taskData.title !== undefined ? taskData.title : existingRow[TASK_COL_TITLE];
     updatedRow[TASK_COL_DESCRIPTION] = taskData.description !== undefined ? taskData.description : existingRow[TASK_COL_DESCRIPTION];
     updatedRow[TASK_COL_ESTIMATED_HOURS] = taskData.estimatedHours !== undefined ? parseFloat(taskData.estimatedHours) : existingRow[TASK_COL_ESTIMATED_HOURS];
-    updatedRow[TASK_COL_PRIORITY] = taskData.priority !== undefined ? taskData.priority : existingRow[TASK_COL_PRIORITY];
-    updatedRow[TASK_COL_IMPORTANCE] = taskData.importance !== undefined ? taskData.importance : (existingRow[TASK_COL_IMPORTANCE] || '中');
+    updatedRow[TASK_COL_AREA] = taskData.area !== undefined ? taskData.area : (existingRow[TASK_COL_AREA] || '今すぐやる');
     updatedRow[TASK_COL_DELIVERABLE] = taskData.deliverable !== undefined ? taskData.deliverable : (existingRow[TASK_COL_DELIVERABLE] || '');
     updatedRow[TASK_COL_DEADLINE] = taskData.deadline !== undefined ? taskData.deadline : (existingRow[TASK_COL_DEADLINE] || '');
     updatedRow[TASK_COL_STATUS] = taskData.status !== undefined ? taskData.status : (existingRow[TASK_COL_STATUS] || '未着手');
@@ -1219,5 +1243,98 @@ function getDailyReport(date) {
   } catch (error) {
     Logger.log('Error in getDailyReport: ' + error.toString());
     return createErrorResponse(error.toString());
+  }
+}
+
+/**
+ * 既存のタスクデータを優先度・重要度から領域に移行
+ * 既存の「優先度」「重要度」列がある場合、領域に変換する
+ */
+function migrateTasksToArea() {
+  try {
+    const ss = getSpreadsheet();
+    const tasksSheet = getSheetSafely(ss, SHEET_NAME_TASKS);
+    
+    if (!tasksSheet) {
+      return createErrorResponse('タスクシートが見つかりません');
+    }
+    
+    const dataRange = tasksSheet.getDataRange();
+    if (!dataRange) {
+      return createSuccessResponse('移行するデータがありません');
+    }
+    
+    const data = dataRange.getValues();
+    if (data.length <= 1) {
+      return createSuccessResponse('移行するデータがありません');
+    }
+    
+    // ヘッダー行を確認
+    const headers = data[0];
+    const priorityColIndex = headers.indexOf('優先度');
+    const importanceColIndex = headers.indexOf('重要度');
+    const areaColIndex = headers.indexOf('領域');
+    
+    // 既に領域列がある場合は移行不要
+    if (areaColIndex >= 0 && priorityColIndex < 0 && importanceColIndex < 0) {
+      return createSuccessResponse('既に移行済みです');
+    }
+    
+    // 優先度・重要度列がない場合は移行不要
+    if (priorityColIndex < 0 || importanceColIndex < 0) {
+      return createSuccessResponse('移行するデータがありません（優先度・重要度列が存在しません）');
+    }
+    
+    let migratedCount = 0;
+    
+    // データ行を処理
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const priority = row[priorityColIndex] || '中';
+      const importance = row[importanceColIndex] || '中';
+      
+      // 優先度・重要度から領域を決定
+      let area = '今すぐやる'; // デフォルト
+      
+      if (priority === '高' && importance === '高') {
+        area = '今すぐやる';
+      } else if (priority === '高' && importance === '低') {
+        area = '今すぐやる'; // 緊急なので
+      } else if (priority === '低' && importance === '高') {
+        area = '計画的にする';
+      } else if (priority === '低' && importance === '低') {
+        area = '計画的にする';
+      } else {
+        // その他の組み合わせは「今すぐやる」をデフォルト
+        area = '今すぐやる';
+      }
+      
+      // 領域列が存在する場合は更新、存在しない場合は追加
+      if (areaColIndex >= 0) {
+        tasksSheet.getRange(i + 1, areaColIndex + 1).setValue(area);
+      } else {
+        // 領域列を追加（優先度列の位置に挿入）
+        tasksSheet.insertColumnAfter(priorityColIndex + 1);
+        tasksSheet.getRange(1, priorityColIndex + 2).setValue('領域');
+        tasksSheet.getRange(1, priorityColIndex + 2).setFontWeight('bold');
+        tasksSheet.getRange(i + 1, priorityColIndex + 2).setValue(area);
+        migratedCount++;
+      }
+      
+      if (areaColIndex >= 0) {
+        migratedCount++;
+      }
+    }
+    
+    // 優先度・重要度列を削除（オプション：コメントアウトしてデータを保持することも可能）
+    // tasksSheet.deleteColumn(priorityColIndex + 1);
+    // if (importanceColIndex > priorityColIndex) {
+    //   tasksSheet.deleteColumn(importanceColIndex);
+    // }
+    
+    return createSuccessResponse(`${migratedCount}件のタスクを移行しました`, { migratedCount: migratedCount });
+  } catch (error) {
+    Logger.log('Error in migrateTasksToArea: ' + error.toString());
+    return createErrorResponse('移行中にエラーが発生しました: ' + error.toString());
   }
 }
